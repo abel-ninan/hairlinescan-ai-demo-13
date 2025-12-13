@@ -1,26 +1,28 @@
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, MutableRefObject } from "react";
 import { Button } from "@/components/ui/button";
 import { ScannerOverlay } from "@/components/ScannerOverlay";
-import { Camera, SwitchCamera, X, Scan } from "lucide-react";
+import { DemoBadge } from "@/components/DemoBadge";
+import { Camera, SwitchCamera, X } from "lucide-react";
 
 interface CameraScreenProps {
-  onCapture: () => void;
+  onStartScan: () => void;
   onCancel: () => void;
+  streamRef: MutableRefObject<MediaStream | null>;
 }
 
-export const CameraScreen = ({ onCapture, onCancel }: CameraScreenProps) => {
+export const CameraScreen = ({ onStartScan, onCancel, streamRef }: CameraScreenProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasCamera, setHasCamera] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   const startCamera = useCallback(async () => {
     setIsLoading(true);
     try {
       // Stop any existing stream
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
       }
 
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -33,41 +35,62 @@ export const CameraScreen = ({ onCapture, onCancel }: CameraScreenProps) => {
         await videoRef.current.play();
       }
 
-      setStream(mediaStream);
+      streamRef.current = mediaStream;
       setHasCamera(true);
+      
+      // Start countdown after camera is ready
+      setCountdown(2);
     } catch (err) {
       console.error("Camera error:", err);
       setHasCamera(false);
     } finally {
       setIsLoading(false);
     }
-  }, [facingMode, stream]);
+  }, [facingMode, streamRef]);
 
   const stopCamera = useCallback(() => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
     }
     setHasCamera(false);
-  }, [stream]);
+    setCountdown(null);
+  }, [streamRef]);
 
   const switchCamera = () => {
+    setCountdown(null); // Reset countdown when switching
     setFacingMode(prev => prev === "user" ? "environment" : "user");
   };
 
+  // Handle countdown
+  useEffect(() => {
+    if (countdown === null) return;
+    
+    if (countdown === 0) {
+      onStartScan();
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown(prev => (prev !== null ? prev - 1 : null));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [countdown, onStartScan]);
+
+  // Restart camera when facing mode changes
   useEffect(() => {
     if (hasCamera) {
       startCamera();
     }
   }, [facingMode]);
 
+  // Cleanup on unmount (but don't stop stream - it's managed by parent)
   useEffect(() => {
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      // Don't stop the stream here - parent manages it
     };
-  }, [stream]);
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-6">
@@ -100,6 +123,17 @@ export const CameraScreen = ({ onCapture, onCancel }: CameraScreenProps) => {
                   <p className="text-sm text-foreground font-medium">Align hairline in guide</p>
                 </div>
               </div>
+
+              {/* Countdown overlay */}
+              {countdown !== null && countdown > 0 && (
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
+                  <div className="px-4 py-2 rounded-full bg-primary/90 backdrop-blur-sm border border-primary/50">
+                    <p className="text-sm text-primary-foreground font-medium">
+                      Auto-scan starting in {countdown}…
+                    </p>
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-secondary/50">
@@ -120,24 +154,14 @@ export const CameraScreen = ({ onCapture, onCancel }: CameraScreenProps) => {
       {/* Controls */}
       <div className="mt-6 space-y-3">
         {hasCamera && (
-          <div className="flex gap-3">
-            <Button 
-              variant="glass" 
-              className="flex-1"
-              onClick={switchCamera}
-            >
-              <SwitchCamera className="w-4 h-4" />
-              Switch Camera
-            </Button>
-            <Button 
-              variant="scanner" 
-              className="flex-1"
-              onClick={() => { stopCamera(); onCapture(); }}
-            >
-              <Scan className="w-4 h-4" />
-              Begin Scan
-            </Button>
-          </div>
+          <Button 
+            variant="glass" 
+            className="w-full"
+            onClick={switchCamera}
+          >
+            <SwitchCamera className="w-4 h-4" />
+            Switch Camera
+          </Button>
         )}
         <Button 
           variant="ghost" 
@@ -146,6 +170,11 @@ export const CameraScreen = ({ onCapture, onCancel }: CameraScreenProps) => {
         >
           Cancel
         </Button>
+      </div>
+
+      {/* Demo badge */}
+      <div className="mt-4 flex justify-center">
+        <DemoBadge />
       </div>
     </div>
   );
