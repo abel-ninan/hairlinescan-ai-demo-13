@@ -1,11 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ProgressBar } from "@/components/ProgressBar";
 import { DemoBadge } from "@/components/DemoBadge";
-import { Scan, Activity, MapPin, AlertCircle, FileText } from "lucide-react";
+import { ScannerOverlay } from "@/components/ScannerOverlay";
+import { Activity, MapPin, AlertCircle, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ScanningScreenProps {
   onComplete: (score: number) => void;
+  stream: MediaStream | null;
 }
 
 const SCAN_STEPS = [
@@ -15,9 +17,18 @@ const SCAN_STEPS = [
   { label: "Generating protocol...", icon: FileText, duration: 1500 },
 ];
 
-export const ScanningScreen = ({ onComplete }: ScanningScreenProps) => {
+export const ScanningScreen = ({ onComplete, stream }: ScanningScreenProps) => {
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Attach stream to video element
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(console.error);
+    }
+  }, [stream]);
 
   useEffect(() => {
     const totalDuration = 6000;
@@ -57,33 +68,49 @@ export const ScanningScreen = ({ onComplete }: ScanningScreenProps) => {
   }, [onComplete]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6">
-      {/* Background effects */}
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-80 h-80 bg-primary/20 rounded-full blur-[120px] animate-pulse-glow" />
+    <div className="min-h-screen flex flex-col p-4 md:p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-foreground">Analyzing...</h2>
+        <DemoBadge />
       </div>
 
-      <div className="relative z-10 max-w-md w-full text-center">
-        {/* Animated scanner icon */}
-        <div className="mb-8 relative">
-          <div className="inline-flex p-6 rounded-3xl bg-primary/10 border border-primary/30 scanner-glow animate-pulse-glow">
-            <Scan className="w-16 h-16 text-primary" />
-          </div>
-          {/* Scanning rings */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-32 h-32 rounded-full border border-primary/30 animate-ping" style={{ animationDuration: '2s' }} />
+      {/* Scanner Frame with Live Video */}
+      <div className="flex-1 flex items-center justify-center">
+        <div className="relative w-full max-w-md aspect-[3/4] rounded-3xl overflow-hidden glass-panel">
+          {/* Live video feed */}
+          {stream ? (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ transform: "scaleX(-1)" }}
+            />
+          ) : (
+            <div className="absolute inset-0 bg-secondary/50" />
+          )}
+          
+          {/* Scanner overlay with active scanning */}
+          <ScannerOverlay isScanning={true} />
+
+          {/* Scanning status in frame */}
+          <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10">
+            <div className="px-4 py-2 rounded-full bg-primary/90 backdrop-blur-sm border border-primary/50 animate-pulse">
+              <p className="text-sm text-primary-foreground font-medium">Scanning in progress...</p>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Title */}
-        <h2 className="text-2xl font-bold text-foreground mb-2">Analyzing Hairline</h2>
-        <p className="text-muted-foreground mb-8">Please wait while we process your scan</p>
-
+      {/* Progress Section */}
+      <div className="mt-6 max-w-md mx-auto w-full">
         {/* Progress bar */}
-        <ProgressBar progress={progress} className="mb-8" />
+        <ProgressBar progress={progress} className="mb-6" />
 
         {/* Current step */}
-        <div className="glass-panel p-4 mb-6">
+        <div className="glass-panel p-4">
           <div className="flex flex-col gap-2">
             {SCAN_STEPS.map((step, index) => {
               const Icon = step.icon;
@@ -122,9 +149,6 @@ export const ScanningScreen = ({ onComplete }: ScanningScreenProps) => {
             })}
           </div>
         </div>
-
-        {/* Demo badge */}
-        <DemoBadge />
       </div>
     </div>
   );

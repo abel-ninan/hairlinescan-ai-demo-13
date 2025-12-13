@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { DemoBadge } from "@/components/DemoBadge";
 import { Scan, Shield, Zap, Brain } from "lucide-react";
 
 interface LandingScreenProps {
@@ -62,8 +63,13 @@ export const LandingScreen = ({ onStart }: LandingScreenProps) => {
           Begin Scan
         </Button>
 
+        {/* Demo badge */}
+        <div className="mt-8">
+          <DemoBadge />
+        </div>
+
         {/* Disclaimer */}
-        <p className="mt-8 text-xs text-muted-foreground/60 max-w-xs mx-auto">
+        <p className="mt-4 text-xs text-muted-foreground/60 max-w-xs mx-auto">
           This is a technology demo. No real medical analysis is performed.
         </p>
       </div>
