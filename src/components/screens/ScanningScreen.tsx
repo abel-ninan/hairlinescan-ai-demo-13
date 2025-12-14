@@ -1,27 +1,34 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ProgressBar } from "@/components/ProgressBar";
 import { DemoBadge } from "@/components/DemoBadge";
 import { ScannerOverlay } from "@/components/ScannerOverlay";
 import { Activity, MapPin, AlertCircle, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CapturedPhotos } from "@/components/screens/CaptureScreen";
+import { QuestionnaireData } from "@/components/Questionnaire";
+import { AnalysisResult } from "@/types/analysis";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface ScanningScreenProps {
-  onComplete: (score: number) => void;
+  onComplete: (score: number, result?: AnalysisResult) => void;
   photos?: CapturedPhotos;
+  questionnaire?: QuestionnaireData;
 }
 
 const SCAN_STEPS = [
-  { label: "Calibrating sensors...", icon: Activity, duration: 1500 },
-  { label: "Mapping hairline topology...", icon: MapPin, duration: 1500 },
-  { label: "Estimating risk factors...", icon: AlertCircle, duration: 1500 },
-  { label: "Generating protocol...", icon: FileText, duration: 1500 },
+  { label: "Uploading images...", icon: Activity, duration: 1500 },
+  { label: "Analyzing hairline topology...", icon: MapPin, duration: 1500 },
+  { label: "Evaluating patterns...", icon: AlertCircle, duration: 1500 },
+  { label: "Generating report...", icon: FileText, duration: 1500 },
 ];
 
-export const ScanningScreen = ({ onComplete, photos }: ScanningScreenProps) => {
+export const ScanningScreen = ({ onComplete, photos, questionnaire }: ScanningScreenProps) => {
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
   const [displayPhotoIndex, setDisplayPhotoIndex] = useState(0);
+  const [analysisComplete, setAnalysisComplete] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
 
   // Get array of captured photos
   const capturedPhotos = photos 
@@ -39,25 +46,103 @@ export const ScanningScreen = ({ onComplete, photos }: ScanningScreenProps) => {
     return () => clearInterval(interval);
   }, [capturedPhotos.length]);
 
+  // Call the AI analysis function
+  const runAnalysis = useCallback(async () => {
+    if (!photos || capturedPhotos.length === 0) {
+      console.log('No photos to analyze');
+      return null;
+    }
+
+    try {
+      console.log(`Sending ${capturedPhotos.length} photos for analysis`);
+      
+      const { data, error } = await supabase.functions.invoke('analyze_hairline', {
+        body: {
+          photos: capturedPhotos,
+          answers: questionnaire || {
+            ageRange: '',
+            timeframe: '',
+            familyHistory: '',
+            shedding: '',
+            scalpIssues: ''
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Analysis error:', error);
+        toast.error('Analysis failed. Using fallback results.');
+        return null;
+      }
+
+      if (data?.error) {
+        console.error('API error:', data.error);
+        toast.error(data.error);
+        return null;
+      }
+
+      console.log('Analysis result:', data);
+      return data as AnalysisResult;
+    } catch (err) {
+      console.error('Failed to call analysis function:', err);
+      toast.error('Failed to connect to analysis service.');
+      return null;
+    }
+  }, [photos, capturedPhotos, questionnaire]);
+
+  // Start analysis when component mounts
   useEffect(() => {
-    const totalDuration = 6000;
+    let cancelled = false;
+
+    const analyze = async () => {
+      const result = await runAnalysis();
+      if (!cancelled) {
+        setAnalysisResult(result);
+        setAnalysisComplete(true);
+      }
+    };
+
+    analyze();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [runAnalysis]);
+
+  // Progress animation
+  useEffect(() => {
+    const totalDuration = 8000; // Slightly longer for real API call
     const interval = 50;
     const increment = 100 / (totalDuration / interval);
     
     const progressTimer = setInterval(() => {
       setProgress(prev => {
         const next = prev + increment;
-        if (next >= 100) {
+        
+        // If analysis is complete and we're at 100%, finish
+        if (next >= 100 && analysisComplete) {
           clearInterval(progressTimer);
-          const seed = Math.floor(Date.now() / 1000);
-          const score = 2 + ((seed * 9301 + 49297) % 233280) / 233280 * 7;
-          setTimeout(() => onComplete(score), 500);
+          setTimeout(() => {
+            const score = analysisResult?.score ?? (2 + Math.random() * 7);
+            onComplete(score, analysisResult || undefined);
+          }, 300);
           return 100;
         }
-        return next;
+        
+        // If we hit 95% but analysis isn't complete, wait
+        if (next >= 95 && !analysisComplete) {
+          return 95;
+        }
+        
+        return Math.min(next, 100);
       });
     }, interval);
 
+    return () => clearInterval(progressTimer);
+  }, [onComplete, analysisComplete, analysisResult]);
+
+  // Update step based on progress
+  useEffect(() => {
     const stepTimer = setInterval(() => {
       setCurrentStep(prev => {
         if (prev < SCAN_STEPS.length - 1) {
@@ -66,13 +151,10 @@ export const ScanningScreen = ({ onComplete, photos }: ScanningScreenProps) => {
         clearInterval(stepTimer);
         return prev;
       });
-    }, 1500);
+    }, 2000);
 
-    return () => {
-      clearInterval(progressTimer);
-      clearInterval(stepTimer);
-    };
-  }, [onComplete]);
+    return () => clearInterval(stepTimer);
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-6">
@@ -102,7 +184,9 @@ export const ScanningScreen = ({ onComplete, photos }: ScanningScreenProps) => {
           {/* Scanning status in frame */}
           <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10">
             <div className="px-4 py-2 rounded-full bg-primary/90 backdrop-blur-sm border border-primary/50 animate-pulse">
-              <p className="text-sm text-primary-foreground font-medium">Analyzing photos...</p>
+              <p className="text-sm text-primary-foreground font-medium">
+                {analysisComplete ? 'Finalizing...' : 'AI Analysis in progress...'}
+              </p>
             </div>
           </div>
 

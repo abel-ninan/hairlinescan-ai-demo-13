@@ -1,0 +1,4 @@
+project_id = "frlycckqncwgelptpvjr"
+
+[functions.analyze_hairline]
+verify_jwt = false

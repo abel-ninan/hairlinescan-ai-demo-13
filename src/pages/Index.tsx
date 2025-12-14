@@ -4,6 +4,7 @@ import { CaptureScreen, CapturedPhotos } from "@/components/screens/CaptureScree
 import { ScanningScreen } from "@/components/screens/ScanningScreen";
 import { ResultsScreen } from "@/components/screens/ResultsScreen";
 import { QuestionnaireData } from "@/components/Questionnaire";
+import { AnalysisResult } from "@/types/analysis";
 
 type AppScreen = "landing" | "capture" | "scanning" | "results";
 
@@ -16,6 +17,7 @@ const Index = () => {
   const [screen, setScreen] = useState<AppScreen>("landing");
   const [riskScore, setRiskScore] = useState<number>(0);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const handleStart = () => {
@@ -27,8 +29,9 @@ const Index = () => {
     setScreen("scanning");
   };
 
-  const handleScanComplete = (score: number) => {
+  const handleScanComplete = (score: number, result?: AnalysisResult) => {
     setRiskScore(score);
+    setAnalysisResult(result || null);
     setScreen("results");
   };
 
@@ -36,6 +39,7 @@ const Index = () => {
     setScreen("landing");
     setRiskScore(0);
     setAnalysisData(null);
+    setAnalysisResult(null);
   };
 
   const handleCancel = () => {
@@ -45,6 +49,7 @@ const Index = () => {
     }
     setScreen("landing");
     setAnalysisData(null);
+    setAnalysisResult(null);
   };
 
   return (
@@ -63,10 +68,15 @@ const Index = () => {
         <ScanningScreen 
           onComplete={handleScanComplete} 
           photos={analysisData?.photos}
+          questionnaire={analysisData?.questionnaire}
         />
       )}
       {screen === "results" && (
-        <ResultsScreen score={riskScore} onRestart={handleRestart} />
+        <ResultsScreen 
+          score={riskScore} 
+          analysis={analysisResult}
+          onRestart={handleRestart} 
+        />
       )}
     </main>
   );
