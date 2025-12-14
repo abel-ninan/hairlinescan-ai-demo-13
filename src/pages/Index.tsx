@@ -1,30 +1,33 @@
 import { useState, useRef } from "react";
 import { LandingScreen } from "@/components/screens/LandingScreen";
-import { CameraScreen } from "@/components/screens/CameraScreen";
+import { CaptureScreen, CapturedPhotos } from "@/components/screens/CaptureScreen";
 import { ScanningScreen } from "@/components/screens/ScanningScreen";
 import { ResultsScreen } from "@/components/screens/ResultsScreen";
+import { QuestionnaireData } from "@/components/Questionnaire";
 
-type AppScreen = "landing" | "camera" | "scanning" | "results";
+type AppScreen = "landing" | "capture" | "scanning" | "results";
+
+interface AnalysisData {
+  photos: CapturedPhotos;
+  questionnaire: QuestionnaireData;
+}
 
 const Index = () => {
   const [screen, setScreen] = useState<AppScreen>("landing");
   const [riskScore, setRiskScore] = useState<number>(0);
+  const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const handleStart = () => {
-    setScreen("camera");
+    setScreen("capture");
   };
 
-  const handleStartScan = () => {
+  const handleAnalyze = (photos: CapturedPhotos, questionnaire: QuestionnaireData) => {
+    setAnalysisData({ photos, questionnaire });
     setScreen("scanning");
   };
 
   const handleScanComplete = (score: number) => {
-    // Stop the camera when scan completes
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
     setRiskScore(score);
     setScreen("results");
   };
@@ -32,15 +35,16 @@ const Index = () => {
   const handleRestart = () => {
     setScreen("landing");
     setRiskScore(0);
+    setAnalysisData(null);
   };
 
   const handleCancel = () => {
-    // Stop camera on cancel
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
     setScreen("landing");
+    setAnalysisData(null);
   };
 
   return (
@@ -48,9 +52,9 @@ const Index = () => {
       {screen === "landing" && (
         <LandingScreen onStart={handleStart} />
       )}
-      {screen === "camera" && (
-        <CameraScreen 
-          onStartScan={handleStartScan} 
+      {screen === "capture" && (
+        <CaptureScreen 
+          onAnalyze={handleAnalyze}
           onCancel={handleCancel}
           streamRef={streamRef}
         />
@@ -58,7 +62,7 @@ const Index = () => {
       {screen === "scanning" && (
         <ScanningScreen 
           onComplete={handleScanComplete} 
-          stream={streamRef.current}
+          photos={analysisData?.photos}
         />
       )}
       {screen === "results" && (
