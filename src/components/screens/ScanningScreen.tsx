@@ -1,13 +1,14 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { ProgressBar } from "@/components/ProgressBar";
 import { DemoBadge } from "@/components/DemoBadge";
 import { ScannerOverlay } from "@/components/ScannerOverlay";
 import { Activity, MapPin, AlertCircle, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CapturedPhotos } from "@/components/screens/CaptureScreen";
 
 interface ScanningScreenProps {
   onComplete: (score: number) => void;
-  stream: MediaStream | null;
+  photos?: CapturedPhotos;
 }
 
 const SCAN_STEPS = [
@@ -17,18 +18,26 @@ const SCAN_STEPS = [
   { label: "Generating protocol...", icon: FileText, duration: 1500 },
 ];
 
-export const ScanningScreen = ({ onComplete, stream }: ScanningScreenProps) => {
+export const ScanningScreen = ({ onComplete, photos }: ScanningScreenProps) => {
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [displayPhotoIndex, setDisplayPhotoIndex] = useState(0);
 
-  // Attach stream to video element
+  // Get array of captured photos
+  const capturedPhotos = photos 
+    ? [photos.front, photos.left, photos.right].filter(Boolean) as string[]
+    : [];
+
+  // Cycle through photos during scanning
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-      videoRef.current.play().catch(console.error);
-    }
-  }, [stream]);
+    if (capturedPhotos.length <= 1) return;
+    
+    const interval = setInterval(() => {
+      setDisplayPhotoIndex(prev => (prev + 1) % capturedPhotos.length);
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [capturedPhotos.length]);
 
   useEffect(() => {
     const totalDuration = 6000;
@@ -40,7 +49,6 @@ export const ScanningScreen = ({ onComplete, stream }: ScanningScreenProps) => {
         const next = prev + increment;
         if (next >= 100) {
           clearInterval(progressTimer);
-          // Generate stable random score (seeded by current time rounded to seconds)
           const seed = Math.floor(Date.now() / 1000);
           const score = 2 + ((seed * 9301 + 49297) % 233280) / 233280 * 7;
           setTimeout(() => onComplete(score), 500);
@@ -50,7 +58,6 @@ export const ScanningScreen = ({ onComplete, stream }: ScanningScreenProps) => {
       });
     }, interval);
 
-    // Update step based on progress
     const stepTimer = setInterval(() => {
       setCurrentStep(prev => {
         if (prev < SCAN_STEPS.length - 1) {
@@ -75,18 +82,15 @@ export const ScanningScreen = ({ onComplete, stream }: ScanningScreenProps) => {
         <DemoBadge />
       </div>
 
-      {/* Scanner Frame with Live Video */}
+      {/* Scanner Frame with Captured Photo */}
       <div className="flex-1 flex items-center justify-center">
         <div className="relative w-full max-w-md aspect-[3/4] rounded-3xl overflow-hidden glass-panel">
-          {/* Live video feed */}
-          {stream ? (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="absolute inset-0 w-full h-full object-cover"
-              style={{ transform: "scaleX(-1)" }}
+          {/* Display captured photos */}
+          {capturedPhotos.length > 0 ? (
+            <img
+              src={capturedPhotos[displayPhotoIndex]}
+              alt="Analyzing"
+              className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
             />
           ) : (
             <div className="absolute inset-0 bg-secondary/50" />
@@ -98,9 +102,26 @@ export const ScanningScreen = ({ onComplete, stream }: ScanningScreenProps) => {
           {/* Scanning status in frame */}
           <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10">
             <div className="px-4 py-2 rounded-full bg-primary/90 backdrop-blur-sm border border-primary/50 animate-pulse">
-              <p className="text-sm text-primary-foreground font-medium">Scanning in progress...</p>
+              <p className="text-sm text-primary-foreground font-medium">Analyzing photos...</p>
             </div>
           </div>
+
+          {/* Photo counter */}
+          {capturedPhotos.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+              <div className="flex gap-1.5">
+                {capturedPhotos.map((_, i) => (
+                  <div 
+                    key={i}
+                    className={cn(
+                      "w-2 h-2 rounded-full transition-all",
+                      i === displayPhotoIndex ? "bg-primary w-4" : "bg-white/50"
+                    )}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
