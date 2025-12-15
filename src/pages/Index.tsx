@@ -42,6 +42,11 @@ const Index = () => {
     setAnalysisResult(null);
   };
 
+  const handleCancelScanning = () => {
+    // Go back to capture screen, keep camera stream alive
+    setScreen("capture");
+  };
+
   const handleCancel = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
@@ -66,7 +71,8 @@ const Index = () => {
       )}
       {screen === "scanning" && (
         <ScanningScreen 
-          onComplete={handleScanComplete} 
+          onComplete={handleScanComplete}
+          onCancel={handleCancelScanning}
           photos={analysisData?.photos}
           questionnaire={analysisData?.questionnaire}
         />
