@@ -112,7 +112,11 @@ export const CaptureScreen = ({ onAnalyze, onCancel, streamRef }: CaptureScreenP
     setTempCapture(null);
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleAnalyze = () => {
+    if (isSubmitting || !canAnalyze) return;
+    setIsSubmitting(true);
     stopCamera();
     onAnalyze(photos, questionnaire);
   };
@@ -255,10 +259,19 @@ export const CaptureScreen = ({ onAnalyze, onCancel, streamRef }: CaptureScreenP
           size="xl"
           className="w-full"
           onClick={handleAnalyze}
-          disabled={!canAnalyze}
+          disabled={!canAnalyze || isSubmitting}
         >
-          <Sparkles className="w-5 h-5" />
-          Analyze Photos
+          {isSubmitting ? (
+            <>
+              <span className="inline-block w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
+              Analyzing…
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-5 h-5" />
+              Analyze Photos
+            </>
+          )}
         </Button>
         
         <Button 
