@@ -48,11 +48,11 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      console.error('LOVABLE_API_KEY not configured');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    if (!GEMINI_API_KEY) {
+      console.error('GEMINI_API_KEY not configured');
       return new Response(
-        JSON.stringify({ error: 'AI service not configured' }),
+        JSON.stringify({ error: 'GEMINI_API_KEY not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -68,39 +68,52 @@ User Information:
 
 Please analyze the provided photos of the hairline/scalp area and provide educational observations.`;
 
-    // Build content array with images
-    const content: any[] = [
-      { type: "text", text: questionnaireContext }
+    // Build parts array for Gemini
+    const parts: any[] = [
+      { text: systemPrompt },
+      { text: questionnaireContext }
     ];
 
-    // Add each photo as an image
+    // Add each photo as inline data
     for (let i = 0; i < photos.length; i++) {
-      content.push({
-        type: "image_url",
-        image_url: { url: photos[i] }
-      });
+      // Extract base64 data and mime type from data URL
+      const dataUrl = photos[i];
+      const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (matches) {
+        const mimeType = matches[1];
+        const base64Data = matches[2];
+        parts.push({
+          inline_data: {
+            mime_type: mimeType,
+            data: base64Data
+          }
+        });
+      }
     }
 
-    console.log(`Analyzing ${photos.length} photo(s) with questionnaire data`);
+    console.log(`Analyzing ${photos.length} photo(s) with questionnaire data using Gemini API`);
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content }
+        contents: [
+          {
+            parts: parts
+          }
         ],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 2048,
+        }
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
+      console.error('Gemini API error:', response.status, errorText);
       
       if (response.status === 429) {
         return new Response(
@@ -108,10 +121,10 @@ Please analyze the provided photos of the hairline/scalp area and provide educat
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      if (response.status === 402) {
+      if (response.status === 403) {
         return new Response(
-          JSON.stringify({ error: 'AI credits exhausted. Please add credits to continue.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: 'API key invalid or quota exceeded.' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
@@ -122,10 +135,10 @@ Please analyze the provided photos of the hairline/scalp area and provide educat
     }
 
     const data = await response.json();
-    const aiContent = data.choices?.[0]?.message?.content;
+    const aiContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!aiContent) {
-      console.error('No content in AI response');
+      console.error('No content in Gemini response:', JSON.stringify(data));
       return new Response(
         JSON.stringify({ error: 'No analysis generated' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -148,7 +161,7 @@ Please analyze the provided photos of the hairline/scalp area and provide educat
       }
       analysisResult = JSON.parse(cleanContent.trim());
     } catch (parseError) {
-      console.error('Failed to parse AI response:', aiContent);
+      console.error('Failed to parse Gemini response:', aiContent);
       return new Response(
         JSON.stringify({ error: 'Failed to parse analysis results' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
