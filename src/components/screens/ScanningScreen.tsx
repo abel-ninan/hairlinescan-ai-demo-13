@@ -2,12 +2,12 @@ import { useState, useEffect } from "react";
 import { ProgressBar } from "@/components/ProgressBar";
 import { DemoBadge } from "@/components/DemoBadge";
 import { ScannerOverlay } from "@/components/ScannerOverlay";
-import { Activity, MapPin, AlertCircle, FileText, RefreshCw } from "lucide-react";
+import { Activity, MapPin, AlertCircle, FileText, RefreshCw, ImageOff, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CapturedPhotos } from "@/components/screens/CaptureScreen";
 import { QuestionnaireData } from "@/components/Questionnaire";
 import { AnalysisResult } from "@/types/analysis";
-import { useAnalysis } from "@/hooks/useAnalysis";
+import { useAnalysis, ErrorType } from "@/hooks/useAnalysis";
 import { Button } from "@/components/ui/button";
 
 interface ScanningScreenProps {
@@ -24,6 +24,33 @@ const SCAN_STEPS = [
   { label: "Generating report...", icon: FileText, duration: 1500 },
 ];
 
+const ERROR_CONFIG: Record<ErrorType, { icon: typeof AlertCircle; title: string; canRetry: boolean; showFallback: boolean }> = {
+  payload_too_large: {
+    icon: ImageOff,
+    title: "Photos Too Large",
+    canRetry: false,
+    showFallback: false
+  },
+  rate_limit: {
+    icon: Clock,
+    title: "Service Busy",
+    canRetry: true,
+    showFallback: false
+  },
+  server_error: {
+    icon: AlertCircle,
+    title: "AI Unavailable",
+    canRetry: true,
+    showFallback: true
+  },
+  network_error: {
+    icon: AlertCircle,
+    title: "Connection Error",
+    canRetry: true,
+    showFallback: true
+  }
+};
+
 export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: ScanningScreenProps) => {
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
@@ -35,13 +62,13 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
   const {
     isAnalyzing,
     error,
+    errorType,
     usedFallback,
     usedSinglePhoto,
     analyze,
     retry
   } = useAnalysis();
 
-  // Get array of captured photos
   const capturedPhotos = photos 
     ? [photos.front, photos.left, photos.right].filter(Boolean) as string[]
     : [];
@@ -72,8 +99,11 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
         scalpIssues: ''
       });
 
-      setAnalysisResult(result);
-      setAnalysisComplete(true);
+      if (result) {
+        setAnalysisResult(result);
+        setAnalysisComplete(true);
+      }
+      // If result is null, error state will be shown via error/errorType
     };
 
     runAnalysis();
@@ -102,7 +132,6 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
       setProgress(prev => {
         const next = prev + increment;
         
-        // If analysis is complete and we're at 100%, finish
         if (next >= 100 && analysisComplete) {
           clearInterval(progressTimer);
           setTimeout(() => {
@@ -112,7 +141,6 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
           return 100;
         }
         
-        // If we hit 95% but analysis isn't complete, wait
         if (next >= 95 && !analysisComplete) {
           return 95;
         }
@@ -139,15 +167,17 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
     return () => clearInterval(stepTimer);
   }, []);
 
-  // Show error state with retry option
-  const showError = error && !isAnalyzing && !analysisComplete;
+  // Show error state - only for non-fallback errors or when not complete
+  const showError = error && errorType && !isAnalyzing && !analysisComplete;
+  const errorConfig = errorType ? ERROR_CONFIG[errorType] : null;
+  const ErrorIcon = errorConfig?.icon || AlertCircle;
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-foreground">
-          {showError ? "Analysis Error" : "Analyzing..."}
+          {showError ? errorConfig?.title || "Analysis Error" : "Analyzing..."}
         </h2>
         <DemoBadge />
       </div>
@@ -155,7 +185,6 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
       {/* Scanner Frame with Captured Photo */}
       <div className="flex-1 flex items-center justify-center">
         <div className="relative w-full max-w-md aspect-[3/4] rounded-3xl overflow-hidden glass-panel">
-          {/* Display captured photos */}
           {capturedPhotos.length > 0 ? (
             <img
               src={capturedPhotos[displayPhotoIndex]}
@@ -166,10 +195,8 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
             <div className="absolute inset-0 bg-secondary/50" />
           )}
           
-          {/* Scanner overlay with active scanning (hide on error) */}
           {!showError && <ScannerOverlay isScanning={true} />}
 
-          {/* Status badge */}
           <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10">
             <div className={cn(
               "px-4 py-2 rounded-full backdrop-blur-sm border",
@@ -179,7 +206,7 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
             )}>
               <p className="text-sm text-primary-foreground font-medium">
                 {showError 
-                  ? "AI unavailable"
+                  ? errorConfig?.title || "Error"
                   : analysisComplete 
                     ? 'Finalizing...' 
                     : 'AI Analysis in progress...'
@@ -188,7 +215,6 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
             </div>
           </div>
 
-          {/* Single photo notice */}
           {usedSinglePhoto && !showError && (
             <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-10">
               <div className="px-3 py-1.5 rounded-full bg-warning/80 backdrop-blur-sm">
@@ -199,7 +225,6 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
             </div>
           )}
 
-          {/* Photo counter */}
           {capturedPhotos.length > 1 && !showError && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
               <div className="flex gap-1.5">
@@ -219,29 +244,33 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
       </div>
 
       {/* Error State */}
-      {showError && (
+      {showError && errorConfig && (
         <div className="mt-6 max-w-md mx-auto w-full">
           <div className="glass-panel p-4 border-destructive/30">
             <div className="flex flex-col items-center text-center gap-3">
-              <AlertCircle className="w-8 h-8 text-destructive" />
+              <ErrorIcon className="w-8 h-8 text-destructive" />
               <div>
-                <h3 className="font-medium text-foreground mb-1">Analysis Failed</h3>
+                <h3 className="font-medium text-foreground mb-1">{errorConfig.title}</h3>
                 <p className="text-sm text-muted-foreground">
                   {error}
                 </p>
               </div>
               <div className="flex gap-3 mt-2">
-                <Button variant="scanner" onClick={handleRetry} disabled={isAnalyzing}>
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Try Again
-                </Button>
+                {errorConfig.canRetry && (
+                  <Button variant="scanner" onClick={handleRetry} disabled={isAnalyzing}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Try Again
+                  </Button>
+                )}
                 <Button variant="ghost" onClick={onCancel}>
-                  Cancel
+                  {errorType === 'payload_too_large' ? 'Retake Photos' : 'Cancel'}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                If this persists, a demo result will be shown.
-              </p>
+              {errorConfig.showFallback && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  A demo result will be shown if analysis continues to fail.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -250,10 +279,8 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
       {/* Progress Section - hide on error */}
       {!showError && (
         <div className="mt-6 max-w-md mx-auto w-full">
-          {/* Progress bar */}
           <ProgressBar progress={progress} className="mb-6" />
 
-          {/* Current step */}
           <div className="glass-panel p-4">
             <div className="flex flex-col gap-2">
               {SCAN_STEPS.map((step, index) => {
