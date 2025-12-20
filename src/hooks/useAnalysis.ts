@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AnalysisResult } from "@/types/analysis";
 import { CapturedPhotos } from "@/components/screens/CaptureScreen";
@@ -7,8 +7,11 @@ import { QuestionnaireData } from "@/components/Questionnaire";
 const MAX_PAYLOAD_SIZE = 1.5 * 1024 * 1024; // 1.5MB
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [2000, 4000, 8000];
+const COOLDOWN_KEY = 'hairline_last_analyze_at';
+const MIN_COOLDOWN_MS = 20000; // 20 seconds
+const DEFAULT_RATE_LIMIT_WAIT = 15; // seconds
 
-export type ErrorType = 'payload_too_large' | 'rate_limit' | 'server_error' | 'network_error';
+export type ErrorType = 'payload_too_large' | 'rate_limit' | 'server_error' | 'network_error' | 'cooldown';
 
 interface UseAnalysisReturn {
   isAnalyzing: boolean;
@@ -16,6 +19,8 @@ interface UseAnalysisReturn {
   errorType: ErrorType | null;
   usedFallback: boolean;
   usedSinglePhoto: boolean;
+  cooldownRemaining: number;
+  rateLimitWait: number;
   analyze: (photos: CapturedPhotos, questionnaire: QuestionnaireData) => Promise<AnalysisResult | null>;
   retry: () => Promise<AnalysisResult | null>;
   clearError: () => void;
@@ -88,41 +93,111 @@ function generateFallbackResult(): AnalysisResult {
   };
 }
 
+// Get last analyze timestamp from localStorage
+function getLastAnalyzeAt(): number {
+  try {
+    const val = localStorage.getItem(COOLDOWN_KEY);
+    return val ? parseInt(val, 10) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+// Save last analyze timestamp to localStorage
+function setLastAnalyzeAt(timestamp: number): void {
+  try {
+    localStorage.setItem(COOLDOWN_KEY, String(timestamp));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 export function useAnalysis(): UseAnalysisReturn {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [usedFallback, setUsedFallback] = useState(false);
   const [usedSinglePhoto, setUsedSinglePhoto] = useState(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const [rateLimitWait, setRateLimitWait] = useState(0);
   
+  const inFlightRef = useRef(false);
   const lastRequestRef = useRef<{ photos: CapturedPhotos; questionnaire: QuestionnaireData } | null>(null);
+
+  // Update cooldown countdown
+  useEffect(() => {
+    const updateCooldown = () => {
+      const lastAt = getLastAnalyzeAt();
+      const elapsed = Date.now() - lastAt;
+      const remaining = Math.max(0, Math.ceil((MIN_COOLDOWN_MS - elapsed) / 1000));
+      setCooldownRemaining(remaining);
+    };
+
+    updateCooldown();
+    const interval = setInterval(updateCooldown, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Update rate limit countdown
+  useEffect(() => {
+    if (rateLimitWait <= 0) return;
+    
+    const interval = setInterval(() => {
+      setRateLimitWait(prev => Math.max(0, prev - 1));
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [rateLimitWait]);
 
   const clearError = useCallback(() => {
     setError(null);
     setErrorType(null);
     setUsedFallback(false);
+    setRateLimitWait(0);
   }, []);
 
   const analyze = useCallback(async (
     photos: CapturedPhotos,
     questionnaire: QuestionnaireData
   ): Promise<AnalysisResult | null> => {
-    if (isAnalyzing) {
+    // Prevent double-clicks and re-entry
+    if (inFlightRef.current || isAnalyzing) {
+      console.log('Analysis already in progress, ignoring');
       return null;
     }
 
+    // Check cooldown
+    const lastAt = getLastAnalyzeAt();
+    const elapsed = Date.now() - lastAt;
+    if (elapsed < MIN_COOLDOWN_MS) {
+      const waitSec = Math.ceil((MIN_COOLDOWN_MS - elapsed) / 1000);
+      setError(`Please wait ${waitSec}s before trying again`);
+      setErrorType('cooldown');
+      return null;
+    }
+
+    // Lock immediately
+    inFlightRef.current = true;
     setIsAnalyzing(true);
     setError(null);
     setErrorType(null);
     setUsedFallback(false);
     setUsedSinglePhoto(false);
+    setRateLimitWait(0);
     lastRequestRef.current = { photos, questionnaire };
+
+    // Save timestamp now (before request)
+    setLastAnalyzeAt(Date.now());
 
     try {
       const photoArray = [photos.front, photos.left, photos.right].filter(Boolean) as string[];
       
       if (photoArray.length === 0) {
-        throw new Error('No photos to analyze');
+        setError('No photos to analyze');
+        setErrorType('network_error');
+        inFlightRef.current = false;
+        setIsAnalyzing(false);
+        return null;
       }
 
       console.log(`Compressing ${photoArray.length} photos...`);
@@ -156,22 +231,36 @@ export function useAnalysis(): UseAnalysisReturn {
             }
           });
 
-          // Check for HTTP error status in the response
-          const httpStatus = (response.error as any)?.status || response.data?.status;
+          // Get HTTP status - Supabase wraps errors
+          const httpStatus = (response.error as any)?.status;
           lastHttpStatus = httpStatus;
 
           // Handle 413 - Payload too large (no retry, no fallback)
           if (httpStatus === 413 || response.data?.error?.includes('too large')) {
             setError('Photos too large — please retake with smaller images');
             setErrorType('payload_too_large');
+            inFlightRef.current = false;
             setIsAnalyzing(false);
             return null;
           }
 
-          // Handle 429 - Rate limit (no retry in loop, let user retry manually)
+          // Handle 429 - Rate limit (NO FALLBACK, show message with wait time)
           if (httpStatus === 429 || response.data?.error?.includes('Rate limit')) {
-            setError('Service is busy — please try again in a moment');
+            // Try to parse Retry-After header if available
+            let waitSeconds = DEFAULT_RATE_LIMIT_WAIT;
+            
+            // Note: Supabase client doesn't expose headers directly, but the edge function 
+            // might return the wait time in the error message
+            const errorMsg = response.data?.error || '';
+            const match = errorMsg.match(/(\d+)\s*seconds?/i);
+            if (match) {
+              waitSeconds = parseInt(match[1], 10);
+            }
+            
+            setRateLimitWait(waitSeconds);
+            setError(`Busy (rate limited). Try again in ${waitSeconds}s.`);
             setErrorType('rate_limit');
+            inFlightRef.current = false;
             setIsAnalyzing(false);
             return null;
           }
@@ -183,20 +272,33 @@ export function useAnalysis(): UseAnalysisReturn {
 
           // Handle other errors from the response
           if (response.error) {
+            // Check message for rate limit indicators
+            const errMsg = response.error.message || '';
+            if (errMsg.includes('Rate limit') || errMsg.includes('429')) {
+              setRateLimitWait(DEFAULT_RATE_LIMIT_WAIT);
+              setError(`Busy (rate limited). Try again in ${DEFAULT_RATE_LIMIT_WAIT}s.`);
+              setErrorType('rate_limit');
+              inFlightRef.current = false;
+              setIsAnalyzing(false);
+              return null;
+            }
             throw new Error(response.error.message || 'Analysis failed');
           }
 
           if (response.data?.error) {
             // Check if it's a rate limit error in the data
             if (response.data.error.includes('Rate limit')) {
-              setError('Service is busy — please try again in a moment');
+              setRateLimitWait(DEFAULT_RATE_LIMIT_WAIT);
+              setError(`Busy (rate limited). Try again in ${DEFAULT_RATE_LIMIT_WAIT}s.`);
               setErrorType('rate_limit');
+              inFlightRef.current = false;
               setIsAnalyzing(false);
               return null;
             }
             if (response.data.error.includes('too large') || response.data.error.includes('Payload')) {
               setError('Photos too large — please retake with smaller images');
               setErrorType('payload_too_large');
+              inFlightRef.current = false;
               setIsAnalyzing(false);
               return null;
             }
@@ -205,6 +307,7 @@ export function useAnalysis(): UseAnalysisReturn {
 
           // Success - return the real result
           console.log('Analysis completed successfully');
+          inFlightRef.current = false;
           setIsAnalyzing(false);
           return response.data as AnalysisResult;
 
@@ -230,6 +333,7 @@ export function useAnalysis(): UseAnalysisReturn {
       setUsedFallback(true);
       setError('AI analysis unavailable — showing demo result');
       setErrorType('server_error');
+      inFlightRef.current = false;
       setIsAnalyzing(false);
       return generateFallbackResult();
 
@@ -241,6 +345,7 @@ export function useAnalysis(): UseAnalysisReturn {
       setError('AI analysis unavailable — showing demo result');
       setErrorType('network_error');
       setUsedFallback(true);
+      inFlightRef.current = false;
       setIsAnalyzing(false);
       return generateFallbackResult();
     }
@@ -252,9 +357,12 @@ export function useAnalysis(): UseAnalysisReturn {
       return null;
     }
 
+    // Clear previous error before retrying
+    clearError();
+
     const { photos, questionnaire } = lastRequestRef.current;
     return analyze(photos, questionnaire);
-  }, [analyze]);
+  }, [analyze, clearError]);
 
   return {
     isAnalyzing,
@@ -262,6 +370,8 @@ export function useAnalysis(): UseAnalysisReturn {
     errorType,
     usedFallback,
     usedSinglePhoto,
+    cooldownRemaining,
+    rateLimitWait,
     analyze,
     retry,
     clearError
