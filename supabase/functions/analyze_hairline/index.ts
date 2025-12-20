@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const MODEL = "gemini-2.5-flash"; // vision-capable + within your free tier
+const MODEL = "gemini-2.5-flash";
 const GEMINI_ENDPOINT =
   `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
@@ -16,17 +16,32 @@ function parseDataUrl(dataUrl: string) {
   return { mimeType: m[1], data: m[2] };
 }
 
+function extractJson(text: string) {
+  const t = (text || "").trim().replace(/^```json/i, "").replace(/^```/i, "").replace(/```$/i, "").trim();
+  const first = t.indexOf("{");
+  const last = t.lastIndexOf("}");
+  if (first === -1 || last === -1 || last <= first) throw new Error("No JSON object found");
+  return JSON.parse(t.slice(first, last + 1));
+}
+
 const systemInstruction = `You are an educational AI assistant that provides general information about hair and scalp health.
 
 CRITICAL GUIDELINES:
-
-- All observations are purely educational
+- You are NOT a medical professional and CANNOT diagnose any condition
+- All observations are NON-DIAGNOSTIC and purely educational
 - Use hedging language like "may", "could", "appears to", "might suggest"
 - Encourage consulting a board-certified dermatologist for concerns
 - Do NOT claim to identify medical conditions with certainty
 - Be supportive and non-alarmist
 
-Return ONLY valid JSON matching the required schema.`;
+OUTPUT RULES (IMPORTANT):
+- Return ONLY a single JSON object (no markdown)
+- Keep it SHORT:
+  - observations: max 4 items
+  - likely_patterns: max 3 items
+  - general_options: exactly 3 items, bullets max 3 each
+  - when_to_see_a_dermatologist: max 3 items
+`;
 
 const responseJsonSchema = {
   type: "object",
@@ -35,21 +50,43 @@ const responseJsonSchema = {
     score: { type: "number", minimum: 0, maximum: 10 },
     confidence: { type: "number", minimum: 0, maximum: 1 },
     summary: { type: "string" },
-    observations: { type: "array", items: { type: "string" } },
-    likely_patterns: { type: "array", items: { type: "string" } },
+    observations: {
+      type: "array",
+      minItems: 2,
+      maxItems: 4,
+      items: { type: "string" },
+    },
+    likely_patterns: {
+      type: "array",
+      minItems: 1,
+      maxItems: 3,
+      items: { type: "string" },
+    },
     general_options: {
       type: "array",
+      minItems: 3,
+      maxItems: 3,
       items: {
         type: "object",
         additionalProperties: false,
         properties: {
           title: { type: "string" },
-          bullets: { type: "array", items: { type: "string" } },
+          bullets: {
+            type: "array",
+            minItems: 2,
+            maxItems: 3,
+            items: { type: "string" },
+          },
         },
         required: ["title", "bullets"],
       },
     },
-    when_to_see_a_dermatologist: { type: "array", items: { type: "string" } },
+    when_to_see_a_dermatologist: {
+      type: "array",
+      minItems: 2,
+      maxItems: 3,
+      items: { type: "string" },
+    },
     disclaimer: { type: "string" },
   },
   required: [
@@ -87,7 +124,7 @@ serve(async (req) => {
       });
     }
 
-    // Use ONLY the first photo for the AI call (keeps free-tier usage stable)
+    // Only first photo for demo stability
     const { mimeType, data } = parseDataUrl(photos[0]);
 
     const questionnaire = `User Information:
@@ -98,30 +135,24 @@ serve(async (req) => {
 - Scalp conditions: ${answers?.scalpIssues || "Not provided"}
 
 Task:
-Analyze the photo of the hairline/scalp area and provide educational, non-diagnostic observations and general options.`;
+Analyze the photo of the hairline/scalp area and provide educational, non-diagnostic observations and general options.
+Return ONLY JSON.`;
 
     const body = {
-      system_instruction: {
-        parts: [{ text: systemInstruction }],
-      },
+      system_instruction: { parts: [{ text: systemInstruction }] },
       contents: [
         {
           parts: [
-            {
-              inline_data: {
-                mime_type: mimeType,
-                data,
-              },
-            },
+            { inline_data: { mime_type: mimeType, data } },
             { text: questionnaire },
           ],
         },
       ],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 600,
+        maxOutputTokens: 900,
         responseMimeType: "application/json",
-        responseJsonSchema,
+        responseJsonSchema: responseJsonSchema,
       },
     };
 
@@ -150,7 +181,6 @@ Analyze the photo of the hairline/scalp area and provide educational, non-diagno
 
     const out = await resp.json();
 
-    // Gemini response text is in candidates[0].content.parts[0].text
     const text =
       out?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text ?? "").join("")?.trim();
 
@@ -161,25 +191,22 @@ Analyze the photo of the hairline/scalp area and provide educational, non-diagno
       });
     }
 
-    // Parse JSON from the model output
-    let parsed;
     try {
-      parsed = JSON.parse(text);
+      const parsed = extractJson(text);
+      return new Response(JSON.stringify(parsed), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     } catch {
-      return new Response(JSON.stringify({ error: "Invalid JSON from model", raw: text.slice(0, 300) }), {
+      return new Response(JSON.stringify({ error: "Invalid JSON from model", raw: text.slice(0, 500) }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    return new Response(JSON.stringify(parsed), {
+  } catch (e) {
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+      status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (error) {
-    console.error("analyze_hairline error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
   }
 });
