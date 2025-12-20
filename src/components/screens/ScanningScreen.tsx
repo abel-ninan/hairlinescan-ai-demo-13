@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ProgressBar } from "@/components/ProgressBar";
 import { DemoBadge } from "@/components/DemoBadge";
 import { ScannerOverlay } from "@/components/ScannerOverlay";
@@ -48,6 +48,12 @@ const ERROR_CONFIG: Record<ErrorType, { icon: typeof AlertCircle; title: string;
     title: "Connection Error",
     canRetry: true,
     showFallback: true
+  },
+  cooldown: {
+    icon: Clock,
+    title: "Please Wait",
+    canRetry: false,
+    showFallback: false
   }
 };
 
@@ -57,7 +63,7 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
   const [displayPhotoIndex, setDisplayPhotoIndex] = useState(0);
   const [analysisComplete, setAnalysisComplete] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
-  const [hasStartedAnalysis, setHasStartedAnalysis] = useState(false);
+  const hasStartedRef = useRef(false);
 
   const {
     isAnalyzing,
@@ -65,6 +71,8 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
     errorType,
     usedFallback,
     usedSinglePhoto,
+    cooldownRemaining,
+    rateLimitWait,
     analyze,
     retry
   } = useAnalysis();
@@ -84,41 +92,59 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
     return () => clearInterval(interval);
   }, [capturedPhotos.length]);
 
-  // Start analysis ONCE when component mounts
+  // Start analysis ONCE when component mounts - using ref to prevent double-firing
   useEffect(() => {
-    if (hasStartedAnalysis || !photos || capturedPhotos.length === 0) return;
+    if (hasStartedRef.current || !photos || capturedPhotos.length === 0) return;
 
-    setHasStartedAnalysis(true);
+    hasStartedRef.current = true;
 
     const runAnalysis = async () => {
-      const result = await analyze(photos, questionnaire || {
-        ageRange: '',
-        timeframe: '',
-        familyHistory: '',
-        shedding: '',
-        scalpIssues: ''
-      });
+      try {
+        const result = await analyze(photos, questionnaire || {
+          ageRange: '',
+          timeframe: '',
+          familyHistory: '',
+          shedding: '',
+          scalpIssues: ''
+        });
 
-      if (result) {
-        setAnalysisResult(result);
-        setAnalysisComplete(true);
+        if (result) {
+          setAnalysisResult(result);
+          setAnalysisComplete(true);
+        }
+        // If result is null, error state will be shown via error/errorType
+      } catch {
+        // Never throw - errors are handled in useAnalysis
       }
-      // If result is null, error state will be shown via error/errorType
     };
 
     runAnalysis();
-  }, [hasStartedAnalysis, photos, capturedPhotos.length, questionnaire, analyze]);
+  }, [photos, capturedPhotos.length, questionnaire, analyze]);
 
   // Handle retry
   const handleRetry = async () => {
+    // Check if rate limit wait is active
+    if (rateLimitWait > 0) {
+      return;
+    }
+    
+    // Check cooldown
+    if (cooldownRemaining > 0) {
+      return;
+    }
+
     setAnalysisComplete(false);
     setProgress(0);
     setCurrentStep(0);
     
-    const result = await retry();
-    if (result) {
-      setAnalysisResult(result);
-      setAnalysisComplete(true);
+    try {
+      const result = await retry();
+      if (result) {
+        setAnalysisResult(result);
+        setAnalysisComplete(true);
+      }
+    } catch {
+      // Never throw - errors are handled in useAnalysis
     }
   };
 
@@ -171,6 +197,14 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
   const showError = error && errorType && !isAnalyzing && !analysisComplete;
   const errorConfig = errorType ? ERROR_CONFIG[errorType] : null;
   const ErrorIcon = errorConfig?.icon || AlertCircle;
+
+  // Determine if retry is currently blocked
+  const retryBlocked = rateLimitWait > 0 || cooldownRemaining > 0 || isAnalyzing;
+  const retryButtonText = rateLimitWait > 0 
+    ? `Wait ${rateLimitWait}s` 
+    : cooldownRemaining > 0 
+      ? `Wait ${cooldownRemaining}s` 
+      : 'Try Again';
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-6">
@@ -257,9 +291,13 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
               </div>
               <div className="flex gap-3 mt-2">
                 {errorConfig.canRetry && (
-                  <Button variant="scanner" onClick={handleRetry} disabled={isAnalyzing}>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Try Again
+                  <Button 
+                    variant="scanner" 
+                    onClick={handleRetry} 
+                    disabled={retryBlocked}
+                  >
+                    <RefreshCw className={cn("w-4 h-4 mr-2", isAnalyzing && "animate-spin")} />
+                    {retryButtonText}
                   </Button>
                 )}
                 <Button variant="ghost" onClick={onCancel}>
