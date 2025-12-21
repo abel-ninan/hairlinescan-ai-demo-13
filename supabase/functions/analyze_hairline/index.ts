@@ -17,76 +17,52 @@ function parseDataUrl(dataUrl: string) {
 }
 
 function extractJson(text: string) {
-  const t = (text || "").trim().replace(/^```json/i, "").replace(/^```/i, "").replace(/```$/i, "").trim();
+  const t = (text || "")
+    .trim()
+    .replace(/^```json/i, "")
+    .replace(/^```/i, "")
+    .replace(/```$/i, "")
+    .trim();
   const first = t.indexOf("{");
   const last = t.lastIndexOf("}");
   if (first === -1 || last === -1 || last <= first) throw new Error("No JSON object found");
   return JSON.parse(t.slice(first, last + 1));
 }
 
-const systemInstruction = `You are an educational AI assistant that provides general information about hair and scalp health.
+function safeParse(text: string) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return extractJson(text);
+  }
+}
 
-CRITICAL GUIDELINES:
-- You are NOT a medical professional and CANNOT diagnose any condition
-- All observations are NON-DIAGNOSTIC and purely educational
-- Use hedging language like "may", "could", "appears to", "might suggest"
-- Encourage consulting a board-certified dermatologist for concerns
-- Do NOT claim to identify medical conditions with certainty
-- Be supportive and non-alarmist
+const systemText = `You are an educational AI assistant about hair/scalp health.
+- Non-diagnostic only, use hedging language ("may", "could", "appears to")
+- Encourage consulting a board-certified dermatologist
+- Output MUST be ONLY JSON (no markdown, no extra text)
+- Keep it concise`;
 
-OUTPUT RULES (IMPORTANT):
-- Return ONLY a single JSON object (no markdown)
-- Keep it SHORT:
-  - observations: max 4 items
-  - likely_patterns: max 3 items
-  - general_options: exactly 3 items, bullets max 3 each
-  - when_to_see_a_dermatologist: max 3 items
-`;
-
-const responseJsonSchema = {
+const responseSchema = {
   type: "object",
-  additionalProperties: false,
   properties: {
-    score: { type: "number", minimum: 0, maximum: 10 },
-    confidence: { type: "number", minimum: 0, maximum: 1 },
+    score: { type: "number" },
+    confidence: { type: "number" },
     summary: { type: "string" },
-    observations: {
-      type: "array",
-      minItems: 2,
-      maxItems: 4,
-      items: { type: "string" },
-    },
-    likely_patterns: {
-      type: "array",
-      minItems: 1,
-      maxItems: 3,
-      items: { type: "string" },
-    },
+    observations: { type: "array", items: { type: "string" } },
+    likely_patterns: { type: "array", items: { type: "string" } },
     general_options: {
       type: "array",
-      minItems: 3,
-      maxItems: 3,
       items: {
         type: "object",
-        additionalProperties: false,
         properties: {
           title: { type: "string" },
-          bullets: {
-            type: "array",
-            minItems: 2,
-            maxItems: 3,
-            items: { type: "string" },
-          },
+          bullets: { type: "array", items: { type: "string" } },
         },
         required: ["title", "bullets"],
       },
     },
-    when_to_see_a_dermatologist: {
-      type: "array",
-      minItems: 2,
-      maxItems: 3,
-      items: { type: "string" },
-    },
+    when_to_see_a_dermatologist: { type: "array", items: { type: "string" } },
     disclaimer: { type: "string" },
   },
   required: [
@@ -102,9 +78,7 @@ const responseJsonSchema = {
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const { photos, answers } = await req.json();
@@ -124,7 +98,7 @@ serve(async (req) => {
       });
     }
 
-    // Only first photo for demo stability
+    // ONLY first photo for demo stability
     const { mimeType, data } = parseDataUrl(photos[0]);
 
     const questionnaire = `User Information:
@@ -134,14 +108,16 @@ serve(async (req) => {
 - Daily shedding level: ${answers?.shedding || "Not provided"}
 - Scalp conditions: ${answers?.scalpIssues || "Not provided"}
 
-Task:
-Analyze the photo of the hairline/scalp area and provide educational, non-diagnostic observations and general options.
-Return ONLY JSON.`;
+Return ONLY JSON matching the schema. Keep it short.`;
 
     const body = {
-      system_instruction: { parts: [{ text: systemInstruction }] },
+      // IMPORTANT: correct REST field name (camelCase)
+      systemInstruction: {
+        parts: [{ text: systemText }],
+      },
       contents: [
         {
+          role: "user",
           parts: [
             { inline_data: { mime_type: mimeType, data } },
             { text: questionnaire },
@@ -150,17 +126,18 @@ Return ONLY JSON.`;
       ],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 900,
+        maxOutputTokens: 700,
         responseMimeType: "application/json",
-        responseJsonSchema: responseJsonSchema,
+        // IMPORTANT: use responseSchema (REST-supported and reliable)
+        responseSchema,
       },
     };
 
     const resp = await fetch(GEMINI_ENDPOINT, {
       method: "POST",
       headers: {
-        "x-goog-api-key": GEMINI_API_KEY,
         "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_API_KEY,
       },
       body: JSON.stringify(body),
     });
@@ -168,37 +145,43 @@ Return ONLY JSON.`;
     if (!resp.ok) {
       const txt = await resp.text().catch(() => "");
       if (resp.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
+        return new Response(JSON.stringify({ error: "Rate limit exceeded. Try again." }), {
           status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "30" },
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      return new Response(JSON.stringify({ error: "AI analysis failed", detail: txt.slice(0, 500) }), {
+      return new Response(JSON.stringify({ error: "Gemini request failed", detail: txt.slice(0, 800) }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const out = await resp.json();
+    const finishReason = out?.candidates?.[0]?.finishReason;
 
     const text =
-      out?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text ?? "").join("")?.trim();
+      out?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text ?? "").join("").trim();
 
     if (!text) {
-      return new Response(JSON.stringify({ error: "No analysis generated" }), {
+      return new Response(JSON.stringify({ error: "No content from model", finishReason }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     try {
-      const parsed = extractJson(text);
+      const parsed = safeParse(text);
       return new Response(JSON.stringify(parsed), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-    } catch {
-      return new Response(JSON.stringify({ error: "Invalid JSON from model", raw: text.slice(0, 500) }), {
+    } catch (e) {
+      return new Response(JSON.stringify({
+        error: "Invalid JSON from model",
+        finishReason,
+        rawHead: text.slice(0, 300),
+        rawTail: text.slice(-300),
+      }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
