@@ -46,7 +46,6 @@ Return ONLY JSON. No markdown. Keep it VERY short.
 // We will expand this into the full app schema in the edge function response.
 const miniResponseSchema = {
   type: "object",
-  additionalProperties: false,
   properties: {
     score: { type: "number" },
     confidence: { type: "number" },
