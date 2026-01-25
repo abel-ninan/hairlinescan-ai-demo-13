@@ -24,7 +24,9 @@ function safeJsonParse(text: string) {
     .replace(/```$/i, "")
     .trim();
 
-  try { return JSON.parse(t); } catch {}
+  try { return JSON.parse(t); } catch {
+    // Fallback: try to find JSON object in text
+  }
 
   const first = t.indexOf("{");
   const last = t.lastIndexOf("}");
@@ -121,7 +123,7 @@ AgeRange:${answers?.ageRange || "NA"} Timeframe:${answers?.timeframe || "NA"} Fa
     const finishReason = out?.candidates?.[0]?.finishReason;
 
     const text =
-      out?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text ?? "").join("").trim();
+      out?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p?.text ?? "").join("").trim();
 
     if (!text) {
       return new Response(JSON.stringify({ error: "No content from model", finishReason }), {

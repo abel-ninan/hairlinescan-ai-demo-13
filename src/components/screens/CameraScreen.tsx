@@ -83,7 +83,7 @@ export const CameraScreen = ({ onStartScan, onCancel, streamRef }: CameraScreenP
     if (hasCamera) {
       startCamera();
     }
-  }, [facingMode]);
+  }, [facingMode, hasCamera, startCamera]);
 
   // Cleanup on unmount (but don't stop stream - it's managed by parent)
   useEffect(() => {

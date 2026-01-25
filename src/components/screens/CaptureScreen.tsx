@@ -126,7 +126,7 @@ export const CaptureScreen = ({ onAnalyze, onCancel, streamRef }: CaptureScreenP
     if (hasCamera) {
       startCamera();
     }
-  }, [facingMode]);
+  }, [facingMode, hasCamera, startCamera]);
 
   // Cleanup on unmount
   useEffect(() => {

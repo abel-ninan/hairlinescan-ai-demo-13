@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { AnalysisResult } from "@/types/analysis";
 import { CapturedPhotos } from "@/components/screens/CaptureScreen";
 import { QuestionnaireData } from "@/components/Questionnaire";
@@ -207,7 +206,7 @@ export function useAnalysis(): UseAnalysisReturn {
       );
 
       let photosToSend = compressedPhotos;
-      let totalSize = compressedPhotos.reduce((sum, p) => sum + getDataUrlSize(p), 0);
+      const totalSize = compressedPhotos.reduce((sum, p) => sum + getDataUrlSize(p), 0);
 
       console.log(`Total compressed size: ${(totalSize / 1024).toFixed(1)}KB`);
 
@@ -217,125 +216,151 @@ export function useAnalysis(): UseAnalysisReturn {
         console.log('Payload too large, using single photo');
       }
 
-      // Retry logic with exponential backoff for 503 only
-      let lastHttpStatus: number | null = null;
-      
-      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        try {
-          console.log(`Analysis attempt ${attempt + 1}/${MAX_RETRIES}`);
+      // Call Gemini API directly
+      const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-          const response = await supabase.functions.invoke('analyze_hairline', {
-            body: {
-              photos: photosToSend,
-              answers: questionnaire
-            }
-          });
+      if (!GEMINI_API_KEY) {
+        setError('Gemini API key not configured. Please add VITE_GEMINI_API_KEY to your .env file');
+        setErrorType('server_error');
+        inFlightRef.current = false;
+        setIsAnalyzing(false);
+        return null;
+      }
 
-          // Get HTTP status - Supabase wraps errors
-          const httpStatus = (response.error as any)?.status;
-          lastHttpStatus = httpStatus;
+      console.log('Calling Gemini API...');
 
-          // Handle 413 - Payload too large (no retry, no fallback)
-          if (httpStatus === 413 || response.data?.error?.includes('too large')) {
-            setError('Photos too large — please retake with smaller images');
-            setErrorType('payload_too_large');
-            inFlightRef.current = false;
-            setIsAnalyzing(false);
-            return null;
+      // Use only the first photo for simplicity
+      const photoDataUrl = photosToSend[0];
+      const [, mimeAndData] = photoDataUrl.split(',');
+      const [mimeType] = photoDataUrl.match(/data:([^;]+);base64/) || ['', 'image/jpeg'];
+      const actualMimeType = mimeType.replace('data:', '').replace(';base64', '');
+
+      const userText = `Analyze hairline photo. Return JSON with: score (0-10), confidence (0-1), summary (max 80 chars), tags (array of 1-3 strings). Age:${questionnaire?.ageRange || "NA"} Timeframe:${questionnaire?.timeframe || "NA"}`;
+
+      const requestBody = {
+        contents: [{
+          parts: [
+            { inline_data: { mime_type: actualMimeType, data: mimeAndData } },
+            { text: userText }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 2048,
+          responseMimeType: "application/json"
+        }
+      };
+
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
           }
+        );
 
-          // Handle 429 - Rate limit (NO FALLBACK, show message with wait time)
-          if (httpStatus === 429 || response.data?.error?.includes('Rate limit')) {
-            // Try to parse Retry-After header if available
-            let waitSeconds = DEFAULT_RATE_LIMIT_WAIT;
-            
-            // Note: Supabase client doesn't expose headers directly, but the edge function 
-            // might return the wait time in the error message
-            const errorMsg = response.data?.error || '';
-            const match = errorMsg.match(/(\d+)\s*seconds?/i);
-            if (match) {
-              waitSeconds = parseInt(match[1], 10);
-            }
-            
-            setRateLimitWait(waitSeconds);
-            setError(`Busy (rate limited). Try again in ${waitSeconds}s.`);
+        if (!response.ok) {
+          const errorData = await response.text();
+          console.error('Gemini API Error Response:', errorData);
+
+          if (response.status === 429) {
+            setRateLimitWait(60);
+            setError('Rate limit exceeded. Try again in 60s.');
             setErrorType('rate_limit');
             inFlightRef.current = false;
             setIsAnalyzing(false);
             return null;
           }
 
-          // Handle 503 - Service unavailable (retry with backoff)
-          if (httpStatus === 503) {
-            throw new Error('Service temporarily unavailable');
-          }
-
-          // Handle other errors from the response
-          if (response.error) {
-            // Check message for rate limit indicators
-            const errMsg = response.error.message || '';
-            if (errMsg.includes('Rate limit') || errMsg.includes('429')) {
-              setRateLimitWait(DEFAULT_RATE_LIMIT_WAIT);
-              setError(`Busy (rate limited). Try again in ${DEFAULT_RATE_LIMIT_WAIT}s.`);
-              setErrorType('rate_limit');
-              inFlightRef.current = false;
-              setIsAnalyzing(false);
-              return null;
-            }
-            throw new Error(response.error.message || 'Analysis failed');
-          }
-
-          if (response.data?.error) {
-            // Check if it's a rate limit error in the data
-            if (response.data.error.includes('Rate limit')) {
-              setRateLimitWait(DEFAULT_RATE_LIMIT_WAIT);
-              setError(`Busy (rate limited). Try again in ${DEFAULT_RATE_LIMIT_WAIT}s.`);
-              setErrorType('rate_limit');
-              inFlightRef.current = false;
-              setIsAnalyzing(false);
-              return null;
-            }
-            if (response.data.error.includes('too large') || response.data.error.includes('Payload')) {
-              setError('Photos too large — please retake with smaller images');
-              setErrorType('payload_too_large');
-              inFlightRef.current = false;
-              setIsAnalyzing(false);
-              return null;
-            }
-            throw new Error(response.data.error);
-          }
-
-          // Success - return the real result
-          console.log('Analysis completed successfully');
+          setError(`Gemini API Error ${response.status}: ${errorData.slice(0, 200)}`);
+          setErrorType('server_error');
           inFlightRef.current = false;
           setIsAnalyzing(false);
-          return response.data as AnalysisResult;
-
-        } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : String(err);
-          console.error(`Attempt ${attempt + 1} failed:`, errorMsg);
-
-          // Only retry on 503 errors
-          if (lastHttpStatus === 503 && attempt < MAX_RETRIES - 1) {
-            const delay = RETRY_DELAYS[attempt];
-            console.log(`Retrying in ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            continue;
-          }
-
-          // For other errors, break out of retry loop
-          break;
+          return null;
         }
-      }
 
-      // All retries failed or non-retriable error - use fallback for 500/network errors
-      console.log('Using fallback result due to server/network error');
-      setUsedFallback(true);
-      setError('AI analysis unavailable — showing demo result');
-      setErrorType('server_error');
-      inFlightRef.current = false;
-      setIsAnalyzing(false);
-      return generateFallbackResult();
+        const data = await response.json();
+        console.log('Gemini API Response:', data);
+
+        const finishReason = data?.candidates?.[0]?.finishReason;
+        console.log('Finish reason:', finishReason);
+
+        const text = data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p?.text ?? "").join("").trim();
+
+        if (!text) {
+          console.error('No text in response. Full response:', data);
+          setError(`No response from Gemini. Reason: ${finishReason || 'unknown'}`);
+          setErrorType('server_error');
+          inFlightRef.current = false;
+          setIsAnalyzing(false);
+          return null;
+        }
+
+        console.log('Raw text from Gemini:', text);
+        console.log('Text length:', text.length);
+
+        // Check if response was truncated
+        if (finishReason === 'MAX_TOKENS') {
+          console.error('Response truncated due to MAX_TOKENS');
+          setError('AI response was truncated. Please try again.');
+          setErrorType('server_error');
+          inFlightRef.current = false;
+          setIsAnalyzing(false);
+          return null;
+        }
+
+        // Parse the JSON response - strip markdown code blocks if present
+        let jsonText = text.trim();
+        // Remove markdown code fences
+        jsonText = jsonText.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```\s*$/, '');
+        // Try to extract JSON object if wrapped in other text
+        const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonText = jsonMatch[0];
+        }
+
+        console.log('Extracted JSON:', jsonText);
+        console.log('Extracted JSON length:', jsonText.length);
+        const parsed = JSON.parse(jsonText);
+        const score = Math.max(0, Math.min(10, Number(parsed.score ?? 5)));
+        const confidence = Math.max(0, Math.min(1, Number(parsed.confidence ?? 0.5)));
+        const summary = String(parsed.summary ?? "Educational estimate based on the photo provided.").slice(0, 260);
+        const tags = Array.isArray(parsed.tags) ? parsed.tags.map(String).slice(0, 3) : [];
+
+        const result: AnalysisResult = {
+          score,
+          confidence,
+          summary,
+          observations: [
+            ...(tags.map((t: string) => `Photo may suggest: ${t}.`)),
+            "Lighting/angle can affect how dense the hair appears in photos."
+          ].slice(0, 4),
+          likely_patterns: tags.length ? tags : ["Temple recession may be present", "Hairline density may vary with lighting"],
+          general_options: [
+            { title: "Basics", bullets: ["Consistent monthly photos (same lighting/angle).", "Sleep, protein, stress management.", "Avoid traction/harsh styling if relevant."] },
+            { title: "Common options (educational)", bullets: ["Topical minoxidil is commonly discussed.", "Ketoconazole shampoo is used by some for scalp health.", "Microneedling is discussed by some users (be cautious)."] },
+            { title: "When to escalate", bullets: ["Rapid changes or irritation.", "If you want diagnosis/personal plan.", "Bring your photo timeline to a dermatologist."] }
+          ],
+          when_to_see_a_dermatologist: [
+            "Sudden or rapidly worsening shedding over weeks.",
+            "Patchy loss, pain, redness, significant flaking/itch.",
+            "Any concern where you want diagnosis/treatment guidance."
+          ],
+          disclaimer: "Educational only — not medical advice or a diagnosis. Photo-based observations are limited. Consult a board-certified dermatologist for concerns."
+        };
+
+        console.log('Analysis completed successfully');
+        inFlightRef.current = false;
+        setIsAnalyzing(false);
+        return result;
+
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        console.error('Gemini API error:', errorMsg);
+        throw err;
+      }
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
