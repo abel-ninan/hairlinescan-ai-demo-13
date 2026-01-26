@@ -35,3 +35,4 @@ ios/App/App.xcworkspace/xcuserdata/
 ios/App/App.xcodeproj/xcuserdata/
 *.xcworkspace
 *.xcuserdata
+.claude/settings.local.json

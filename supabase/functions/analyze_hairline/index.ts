@@ -6,6 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Note: For production, restrict Access-Control-Allow-Origin to your app's domain
+
 const MODEL = "gemini-2.5-flash";
 const GEMINI_ENDPOINT =
   `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
@@ -67,12 +69,15 @@ serve(async (req) => {
 
     const userText =
       `Return ONLY ONE LINE of MINIFIED JSON. No markdown. No extra text.
-Keys must be EXACTLY: score, confidence, summary, tags
+Keys must be EXACTLY: score, confidence, summary, tags, hairline_type, hairline_description, personalized_tips
 Rules:
-- score: 0-10 number
+- score: 0-10 number (0=severe loss, 10=no loss)
 - confidence: 0-1 number
 - summary: <= 120 chars
 - tags: array of 1-3 very short strings
+- hairline_type: specific type e.g. "Widow's Peak", "Mature Hairline", "Receding Temples", "M-shaped", "Straight", "Rounded"
+- hairline_description: 1 sentence explaining what this hairline type means
+- personalized_tips: array of 3 specific tips for THIS hairline type, not generic advice
 STOP AFTER THE FINAL }.
 
 AgeRange:${answers?.ageRange || "NA"} Timeframe:${answers?.timeframe || "NA"} Family:${answers?.familyHistory || "NA"} Shedding:${answers?.shedding || "NA"} Scalp:${answers?.scalpIssues || "NA"}`;
@@ -146,6 +151,11 @@ AgeRange:${answers?.ageRange || "NA"} Timeframe:${answers?.timeframe || "NA"} Fa
     const confidence = Math.max(0, Math.min(1, Number(mini.confidence ?? 0.5)));
     const summary = String(mini.summary ?? "Educational estimate based on the photo provided.").slice(0, 260);
     const tags = Array.isArray(mini.tags) ? mini.tags.map(String).slice(0, 3) : [];
+    const hairlineType = mini.hairline_type ? String(mini.hairline_type) : undefined;
+    const hairlineDescription = mini.hairline_description ? String(mini.hairline_description) : undefined;
+    const personalizedTips = Array.isArray(mini.personalized_tips)
+      ? mini.personalized_tips.map(String).slice(0, 5)
+      : undefined;
 
     const result = {
       score,
@@ -168,6 +178,9 @@ AgeRange:${answers?.ageRange || "NA"} Timeframe:${answers?.timeframe || "NA"} Fa
       ],
       disclaimer:
         "Educational only — not medical advice or a diagnosis. Photo-based observations are limited. Consult a board-certified dermatologist for concerns.",
+      hairline_type: hairlineType,
+      hairline_description: hairlineDescription,
+      personalized_tips: personalizedTips,
     };
 
     return new Response(JSON.stringify(result), {

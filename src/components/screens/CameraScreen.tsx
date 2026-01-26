@@ -40,8 +40,8 @@ export const CameraScreen = ({ onStartScan, onCancel, streamRef }: CameraScreenP
       
       // Start countdown after camera is ready
       setCountdown(2);
-    } catch (err) {
-      console.error("Camera error:", err);
+    } catch {
+      // Camera access denied or not available
       setHasCamera(false);
     } finally {
       setIsLoading(false);

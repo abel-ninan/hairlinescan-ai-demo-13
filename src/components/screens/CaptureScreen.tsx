@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScannerOverlay } from "@/components/ScannerOverlay";
-import { DemoBadge } from "@/components/DemoBadge";
+import { FaceScanOverlay } from "@/components/FaceScanOverlay";
 import { PhotoCapture } from "@/components/PhotoCapture";
 import { PhotoStepper, PhotoType } from "@/components/PhotoStepper";
 import { Questionnaire, QuestionnaireData } from "@/components/Questionnaire";
@@ -39,7 +39,8 @@ export const CaptureScreen = ({ onAnalyze, onCancel, streamRef }: CaptureScreenP
   const [currentPhotoStep, setCurrentPhotoStep] = useState<PhotoType>("front");
   const [photos, setPhotos] = useState<CapturedPhotos>({ front: null, left: null, right: null });
   const [tempCapture, setTempCapture] = useState<string | null>(null);
-  
+  const [isScanning, setIsScanning] = useState(false);
+
   const [questionnaire, setQuestionnaire] = useState<QuestionnaireData>(initialQuestionnaire);
 
   const hasAtLeastOnePhoto = photos.front !== null || photos.left !== null || photos.right !== null;
@@ -64,8 +65,8 @@ export const CaptureScreen = ({ onAnalyze, onCancel, streamRef }: CaptureScreenP
 
       streamRef.current = mediaStream;
       setHasCamera(true);
-    } catch (err) {
-      console.error("Camera error:", err);
+    } catch {
+      // Camera access denied or not available
       setHasCamera(false);
     } finally {
       setIsLoading(false);
@@ -88,15 +89,26 @@ export const CaptureScreen = ({ onAnalyze, onCancel, streamRef }: CaptureScreenP
     setTempCapture(dataUrl);
   };
 
-  const handleRetake = () => {
+  const handleRetake = async () => {
     setTempCapture(null);
+    // Re-attach stream to video element
+    setTimeout(async () => {
+      if (videoRef.current && streamRef.current) {
+        videoRef.current.srcObject = streamRef.current;
+        try {
+          await videoRef.current.play();
+        } catch {
+          // Video play failed - may be interrupted
+        }
+      }
+    }, 50);
   };
 
-  const handleUsePhoto = () => {
+  const handleUsePhoto = async () => {
     if (tempCapture) {
       setPhotos(prev => ({ ...prev, [currentPhotoStep]: tempCapture }));
       setTempCapture(null);
-      
+
       // Auto-advance to next step if available
       const steps: PhotoType[] = ["front", "left", "right"];
       const currentIndex = steps.indexOf(currentPhotoStep);
@@ -104,6 +116,18 @@ export const CaptureScreen = ({ onAnalyze, onCancel, streamRef }: CaptureScreenP
       if (nextStep) {
         setCurrentPhotoStep(nextStep);
       }
+
+      // Re-attach stream to video element after clearing tempCapture
+      setTimeout(async () => {
+        if (videoRef.current && streamRef.current) {
+          videoRef.current.srcObject = streamRef.current;
+          try {
+            await videoRef.current.play();
+          } catch {
+            // Video play failed - may be interrupted
+          }
+        }
+      }, 50);
     }
   };
 
@@ -174,15 +198,18 @@ export const CaptureScreen = ({ onAnalyze, onCancel, streamRef }: CaptureScreenP
                 style={{ transform: facingMode === "user" ? "scaleX(-1)" : "none" }}
               />
               <ScannerOverlay isScanning={false} />
-              
+              <FaceScanOverlay isScanning={isScanning} />
+
               {/* Guide label */}
-              <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10">
-                <div className="px-4 py-2 rounded-full bg-background/80 backdrop-blur-sm border border-border/50">
-                  <p className="text-sm text-foreground font-medium">
-                    Capture: {stepLabels[currentPhotoStep]}
-                  </p>
+              {!isScanning && (
+                <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
+                  <div className="px-4 py-2 rounded-full bg-background/80 backdrop-blur-sm border border-border">
+                    <p className="text-sm text-foreground font-medium">
+                      {stepLabels[currentPhotoStep]}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           ) : tempCapture ? (
             <img 
@@ -216,6 +243,8 @@ export const CaptureScreen = ({ onAnalyze, onCancel, streamRef }: CaptureScreenP
               onRetake={handleRetake}
               onUse={handleUsePhoto}
               hasCamera={hasCamera}
+              onScanStart={() => setIsScanning(true)}
+              onScanEnd={() => setIsScanning(false)}
             />
             
             {!tempCapture && (
@@ -283,10 +312,6 @@ export const CaptureScreen = ({ onAnalyze, onCancel, streamRef }: CaptureScreenP
         </Button>
       </div>
 
-      {/* Demo badge */}
-      <div className="mt-4 flex justify-center">
-        <DemoBadge />
-      </div>
     </div>
   );
 };

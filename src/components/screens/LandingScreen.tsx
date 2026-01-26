@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { DemoBadge } from "@/components/DemoBadge";
-import { Scan, Shield, Zap, Brain } from "lucide-react";
+import { Shield, Zap, Brain, Scan, AlertCircle } from "lucide-react";
 
 interface LandingScreenProps {
   onStart: () => void;
@@ -9,69 +8,68 @@ interface LandingScreenProps {
 export const LandingScreen = ({ onStart }: LandingScreenProps) => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6">
-      {/* Background glow */}
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-primary/10 rounded-full blur-[100px]" />
-      </div>
-
       <div className="relative z-10 max-w-md w-full text-center">
-        {/* Logo/Icon */}
-        <div className="mb-8 animate-float">
-          <div className="inline-flex p-4 rounded-3xl bg-primary/10 border border-primary/20 scanner-glow">
-            <Scan className="w-12 h-12 text-primary" />
-          </div>
+        {/* Logo */}
+        <div className="mb-8">
+          <img
+            src="/logo.png"
+            alt="HairlineScan"
+            className="w-24 h-24 mx-auto rounded-2xl"
+          />
         </div>
 
         {/* Title */}
-        <h1 className="text-4xl md:text-5xl font-bold mb-3 font-display">
-          <span className="text-gradient">HairlineScan</span>
+        <h1 className="text-4xl md:text-5xl font-semibold mb-3 font-display text-foreground">
+          HairlineScan
         </h1>
-        <p className="text-lg text-muted-foreground mb-2">(Demo)</p>
-        
+
         {/* Tagline */}
-        <p className="text-muted-foreground mb-10 max-w-xs mx-auto leading-relaxed">
-          Advanced AI-powered hairline analysis using computer vision technology
+        <p className="text-muted-foreground mb-12 max-w-sm mx-auto leading-relaxed">
+          AI-powered hairline analysis using advanced computer vision
         </p>
 
         {/* Features */}
-        <div className="grid grid-cols-3 gap-4 mb-10">
+        <div className="grid grid-cols-3 gap-3 mb-12" role="list" aria-label="App features">
           {[
-            { icon: Brain, label: "AI Analysis" },
-            { icon: Zap, label: "Instant Results" },
-            { icon: Shield, label: "Private & Secure" },
-          ].map(({ icon: Icon, label }, i) => (
-            <div 
+            { icon: Brain, label: "AI Analysis", description: "Advanced AI-powered analysis" },
+            { icon: Zap, label: "Instant", description: "Get results in seconds" },
+            { icon: Shield, label: "Private", description: "Your photos stay on device" },
+          ].map(({ icon: Icon, label, description }, i) => (
+            <div
               key={label}
+              role="listitem"
               className="glass-panel p-4 opacity-0 animate-fade-up"
-              style={{ animationDelay: `${i * 100 + 200}ms`, animationFillMode: 'forwards' }}
+              style={{ animationDelay: `${i * 75 + 100}ms`, animationFillMode: 'forwards' }}
+              aria-label={description}
             >
-              <Icon className="w-5 h-5 text-primary mx-auto mb-2" />
+              <Icon className="w-5 h-5 text-primary mx-auto mb-2" aria-hidden="true" />
               <p className="text-xs text-muted-foreground">{label}</p>
             </div>
           ))}
         </div>
 
         {/* CTA Button */}
-        <Button 
-          variant="scanner" 
-          size="xl" 
+        <Button
+          variant="scanner"
+          size="xl"
           onClick={onStart}
           className="w-full opacity-0 animate-fade-up"
-          style={{ animationDelay: '500ms', animationFillMode: 'forwards' }}
+          style={{ animationDelay: '300ms', animationFillMode: 'forwards' }}
+          aria-label="Begin hairline scan"
         >
-          <Scan className="w-5 h-5" />
+          <Scan className="w-5 h-5" aria-hidden="true" />
           Begin Scan
         </Button>
 
-        {/* Demo badge */}
-        <div className="mt-8">
-          <DemoBadge />
+        {/* Medical Disclaimer */}
+        <div className="mt-8 p-4 rounded-xl bg-secondary/50 border border-border opacity-0 animate-fade-up" style={{ animationDelay: '400ms', animationFillMode: 'forwards' }}>
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" aria-hidden="true" />
+            <p className="text-xs text-muted-foreground leading-relaxed text-left">
+              <strong>Not Medical Advice:</strong> This app provides educational information only and is not a substitute for professional medical diagnosis or treatment. Always consult a dermatologist for hair loss concerns.
+            </p>
+          </div>
         </div>
-
-        {/* Disclaimer */}
-        <p className="mt-4 text-xs text-muted-foreground/60 max-w-xs mx-auto">
-          This is a technology demo. No real medical analysis is performed.
-        </p>
       </div>
     </div>
   );
