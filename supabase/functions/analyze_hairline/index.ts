@@ -1,12 +1,50 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// Allowed origins for CORS - add your production domain here
+const ALLOWED_ORIGINS = [
+  "capacitor://localhost",      // iOS app
+  "http://localhost",           // iOS app fallback
+  "http://localhost:5173",      // Local dev server
+  "http://localhost:8100",      // Capacitor dev
+  // Add your production domain when deployed:
+  // "https://yourdomain.com",
+];
 
-// Note: For production, restrict Access-Control-Allow-Origin to your app's domain
+// Simple in-memory rate limiting (resets on function cold start)
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_MAX = 10;        // Max requests per window
+const RATE_LIMIT_WINDOW = 60000;  // 1 minute window
+
+function isRateLimited(identifier: string): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(identifier);
+
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(identifier, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return false;
+  }
+
+  if (record.count >= RATE_LIMIT_MAX) {
+    return true;
+  }
+
+  record.count++;
+  return false;
+}
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  // Check if origin is allowed
+  const allowedOrigin = origin && ALLOWED_ORIGINS.some(allowed =>
+    origin === allowed || origin.startsWith(allowed)
+  ) ? origin : ALLOWED_ORIGINS[0];
+
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+  };
+}
 
 const MODEL = "gemini-2.5-flash";
 const GEMINI_ENDPOINT =
@@ -44,13 +82,39 @@ Keep it SHORT.
 `.trim();
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  // Get client identifier for rate limiting (use IP or fallback)
+  const clientIP = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || req.headers.get("cf-connecting-ip")
+    || "unknown";
+
+  // Check rate limit
+  if (isRateLimited(clientIP)) {
+    return new Response(JSON.stringify({ error: "Too many requests. Please wait a moment." }), {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" },
+    });
+  }
 
   try {
     const { photos, answers } = await req.json();
 
     if (!photos || !Array.isArray(photos) || photos.length === 0) {
       return new Response(JSON.stringify({ error: "At least one photo is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate photo data format
+    if (!photos[0] || typeof photos[0] !== "string" || !photos[0].startsWith("data:image/")) {
+      return new Response(JSON.stringify({ error: "Invalid photo format" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
