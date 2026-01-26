@@ -5,9 +5,7 @@ import {
   RotateCcw,
   Sun,
   Droplets,
-  Heart,
   Stethoscope,
-  Lightbulb,
   Share2,
   Download,
   AlertTriangle,
@@ -15,6 +13,10 @@ import {
   Sparkles,
   User,
   Check,
+  Pill,
+  Leaf,
+  Eye,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -74,14 +76,22 @@ const MetricRow = ({ label, value, delay = 0 }: MetricRowProps) => {
   );
 };
 
-const getProtocolIcon = (title: string) => {
-  const lower = title.toLowerCase();
-  if (lower.includes('light') || lower.includes('laser')) return Sun;
-  if (lower.includes('minoxidil') || lower.includes('topical')) return Droplets;
-  if (lower.includes('lifestyle') || lower.includes('nutrition') || lower.includes('stress')) return Heart;
-  if (lower.includes('doctor') || lower.includes('dermat') || lower.includes('consult')) return Stethoscope;
-  return Lightbulb;
-};
+// Medical treatments data
+const medicalTreatments = [
+  { name: "Minoxidil", description: "FDA-approved topical that may slow loss and stimulate regrowth" },
+  { name: "Finasteride", description: "Prescription oral medication that blocks DHT hormone" },
+  { name: "Ketoconazole Shampoo", description: "Anti-fungal shampoo that may support scalp health" },
+  { name: "Spironolactone", description: "Prescription option sometimes used for hormonal hair loss" },
+];
+
+// Holistic treatments data
+const holisticTreatments = [
+  { name: "Red Light Therapy", description: "Low-level laser therapy (LLLT) to stimulate follicles" },
+  { name: "Microneedling", description: "Derma rolling to boost blood flow and absorption" },
+  { name: "Castor Oil", description: "Natural oil that may nourish and strengthen hair" },
+  { name: "Scalp Massage", description: "Regular massage to improve circulation" },
+  { name: "Biotin Supplements", description: "B-vitamin that supports hair, skin, and nail health" },
+];
 
 export const ResultsScreen = ({ score, analysis, onRestart, photo }: ResultsScreenProps) => {
   const [activeTab, setActiveTab] = useState<'rating' | 'tips'>('rating');
@@ -165,11 +175,6 @@ export const ResultsScreen = ({ score, analysis, onRestart, photo }: ResultsScre
     };
   }, [imageInvalid, overallScore]);
 
-  const tips = analysis?.general_options || [
-    { title: "Red Light Therapy", bullets: ["Low-level laser therapy (LLLT) may help stimulate hair follicles and promote growth cycles."] },
-    { title: "Minoxidil", bullets: ["FDA-approved topical treatment that may slow hair loss and stimulate regrowth."] },
-    { title: "Lifestyle", bullets: ["Maintain balanced nutrition, manage stress, ensure adequate sleep."] },
-  ];
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-6">
@@ -334,114 +339,141 @@ export const ResultsScreen = ({ score, analysis, onRestart, photo }: ResultsScre
           </>
         ) : (
           <>
-            {/* Tips Content */}
-            <div className="space-y-4 flex-1">
-              {/* Personalized Tips Section */}
-              {analysis?.personalized_tips && analysis.personalized_tips.length > 0 && (
+            {/* Tips Content - Redesigned */}
+            <div className="space-y-5 flex-1 overflow-y-auto pb-4">
+
+              {/* Observations Section - At Top */}
+              {analysis?.observations && analysis.observations.length > 0 && (
                 <div
-                  className="glass-panel p-4 border-l-2 border-l-primary opacity-0 animate-fade-up"
+                  className="opacity-0 animate-fade-up"
                   style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <Sparkles className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-medium text-foreground">Personalized for You</h3>
-                        {analysis.hairline_type && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                            {analysis.hairline_type}
-                          </span>
-                        )}
+                  <div className="flex items-center gap-2 mb-3">
+                    <Eye className="w-4 h-4 text-primary" />
+                    <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Observations</h3>
+                  </div>
+                  <div className="glass-panel p-4 space-y-2">
+                    {analysis.observations.map((obs, j) => (
+                      <div key={j} className="flex items-start gap-3">
+                        <ChevronRight className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-foreground leading-relaxed">{obs}</p>
                       </div>
-                      <ul className="space-y-2">
-                        {analysis.personalized_tips.map((tip, j) => (
-                          <li key={j} className="text-sm text-muted-foreground flex gap-2">
-                            <span className="text-primary">•</span>
-                            {tip}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* General Tips Header */}
+              {/* Personalized Tips Section */}
               {analysis?.personalized_tips && analysis.personalized_tips.length > 0 && (
-                <h4 className="text-xs text-muted-foreground uppercase tracking-wide mt-4 mb-2 opacity-0 animate-fade-up" style={{ animationDelay: '75ms', animationFillMode: 'forwards' }}>
-                  General Tips
-                </h4>
+                <div
+                  className="opacity-0 animate-fade-up"
+                  style={{ animationDelay: '75ms', animationFillMode: 'forwards' }}
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                      Personalized for You
+                    </h3>
+                    {analysis.hairline_type && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary ml-auto">
+                        {analysis.hairline_type}
+                      </span>
+                    )}
+                  </div>
+                  <div className="glass-panel p-4 border-l-2 border-l-primary space-y-3">
+                    {analysis.personalized_tips.map((tip, j) => (
+                      <div key={j} className="flex items-start gap-3">
+                        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-xs text-primary font-medium">{j + 1}</span>
+                        </div>
+                        <p className="text-sm text-foreground leading-relaxed">{tip}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
-              {tips.map((tip, i) => {
-                const Icon = getProtocolIcon(tip.title);
-                const hasPersonalizedTips = analysis?.personalized_tips && analysis.personalized_tips.length > 0;
-                const baseDelay = hasPersonalizedTips ? 150 : 0;
-                return (
-                  <div
-                    key={i}
-                    className="glass-panel p-4 opacity-0 animate-fade-up"
-                    style={{ animationDelay: `${baseDelay + i * 75}ms`, animationFillMode: 'forwards' }}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-primary/10">
-                        <Icon className="w-5 h-5 text-primary" />
+              {/* Medical & Chemical Section */}
+              <div
+                className="opacity-0 animate-fade-up"
+                style={{ animationDelay: '150ms', animationFillMode: 'forwards' }}
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <Pill className="w-4 h-4 text-blue-400" />
+                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Medical & Chemical</h3>
+                </div>
+                <div className="glass-panel overflow-hidden">
+                  {medicalTreatments.map((treatment, i) => (
+                    <div
+                      key={treatment.name}
+                      className={cn(
+                        "p-4 flex items-center gap-4",
+                        i !== medicalTreatments.length - 1 && "border-b border-border/50"
+                      )}
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                        <Droplets className="w-5 h-5 text-blue-400" />
                       </div>
-                      <div className="flex-1">
-                        <h3 className="font-medium text-foreground mb-1">{tip.title}</h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          {tip.bullets.join(' ')}
-                        </p>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-medium text-foreground">{treatment.name}</h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{treatment.description}</p>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  ))}
+                </div>
+              </div>
+
+              {/* Holistic Section */}
+              <div
+                className="opacity-0 animate-fade-up"
+                style={{ animationDelay: '225ms', animationFillMode: 'forwards' }}
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <Leaf className="w-4 h-4 text-green-400" />
+                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Holistic</h3>
+                </div>
+                <div className="glass-panel overflow-hidden">
+                  {holisticTreatments.map((treatment, i) => (
+                    <div
+                      key={treatment.name}
+                      className={cn(
+                        "p-4 flex items-center gap-4",
+                        i !== holisticTreatments.length - 1 && "border-b border-border/50"
+                      )}
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                        <Sun className="w-5 h-5 text-green-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-medium text-foreground">{treatment.name}</h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{treatment.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               {/* When to See a Dermatologist */}
               {analysis?.when_to_see_a_dermatologist && analysis.when_to_see_a_dermatologist.length > 0 && (
                 <div
-                  className="glass-panel p-4 border-l-2 border-l-primary opacity-0 animate-fade-up"
-                  style={{ animationDelay: `${(analysis?.personalized_tips?.length ? 150 : 0) + tips.length * 75}ms`, animationFillMode: 'forwards' }}
+                  className="opacity-0 animate-fade-up"
+                  style={{ animationDelay: '300ms', animationFillMode: 'forwards' }}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <Stethoscope className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-foreground mb-2">When to See a Dermatologist</h3>
-                      <ul className="space-y-1">
-                        {analysis.when_to_see_a_dermatologist.map((reason, j) => (
-                          <li key={j} className="text-sm text-muted-foreground flex gap-2">
-                            <span className="text-primary">•</span>
-                            {reason}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Stethoscope className="w-4 h-4 text-red-400" />
+                    <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">See a Dermatologist If</h3>
+                  </div>
+                  <div className="glass-panel p-4 border-l-2 border-l-red-400/50 space-y-2">
+                    {analysis.when_to_see_a_dermatologist.map((reason, j) => (
+                      <div key={j} className="flex items-start gap-3">
+                        <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-foreground leading-relaxed">{reason}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* Observations */}
-              {analysis?.observations && analysis.observations.length > 0 && (
-                <div
-                  className="glass-panel p-4 opacity-0 animate-fade-up"
-                  style={{ animationDelay: `${(analysis?.personalized_tips?.length ? 150 : 0) + (tips.length + 1) * 75}ms`, animationFillMode: 'forwards' }}
-                >
-                  <h3 className="font-medium text-foreground mb-2">Observations</h3>
-                  <ul className="space-y-1">
-                    {analysis.observations.map((obs, j) => (
-                      <li key={j} className="text-sm text-muted-foreground flex gap-2">
-                        <span className="text-primary">•</span>
-                        {obs}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </div>
           </>
         )}

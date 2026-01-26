@@ -214,63 +214,65 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
         </h2>
       </div>
 
-      {/* Scanner Frame with Captured Photo */}
+      {/* Logo-centered Loading View */}
       <div className="flex-1 flex items-center justify-center">
-        <div className="relative w-full max-w-md aspect-[3/4] rounded-3xl overflow-hidden glass-panel">
-          {capturedPhotos.length > 0 ? (
-            <img
-              src={capturedPhotos[displayPhotoIndex]}
-              alt="Analyzing"
-              className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
-            />
-          ) : (
-            <div className="absolute inset-0 bg-secondary/50" />
-          )}
-          
-          {!showError && <ScannerOverlay isScanning={true} />}
-
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
-            <div className={cn(
-              "px-4 py-2 rounded-full border",
-              showError
-                ? "bg-destructive text-destructive-foreground"
-                : "bg-primary text-primary-foreground"
-            )}>
-              <p className="text-sm font-medium">
-                {showError
-                  ? errorConfig?.title || "Error"
-                  : analysisComplete
-                    ? 'Finalizing...'
-                    : 'Analyzing...'
-                }
-              </p>
+        <div className="relative flex flex-col items-center">
+          {/* Logo with pulse animation */}
+          <div className={cn(
+            "relative mb-8",
+            !showError && "animate-pulse"
+          )}>
+            <div className="w-32 h-32 rounded-3xl overflow-hidden shadow-2xl shadow-primary/20">
+              <img
+                src="/logo.png"
+                alt="HairlineScan"
+                className="w-full h-full object-cover"
+              />
             </div>
+            {!showError && (
+              <div className="absolute inset-0 rounded-3xl border-2 border-primary/50 animate-ping" style={{ animationDuration: '2s' }} />
+            )}
           </div>
 
-          {usedSinglePhoto && !showError && (
-            <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-10">
-              <div className="px-3 py-1.5 rounded-full bg-warning/80 backdrop-blur-sm">
-                <p className="text-xs text-warning-foreground font-medium">
-                  Using primary photo for faster analysis
-                </p>
-              </div>
+          {/* Status text */}
+          <div className={cn(
+            "px-6 py-3 rounded-full",
+            showError
+              ? "bg-destructive/10 border border-destructive/30"
+              : "bg-primary/10 border border-primary/30"
+          )}>
+            <p className={cn(
+              "text-sm font-medium",
+              showError ? "text-destructive" : "text-primary"
+            )}>
+              {showError
+                ? errorConfig?.title || "Error"
+                : analysisComplete
+                  ? 'Finalizing...'
+                  : SCAN_STEPS[currentStep]?.label || 'Analyzing...'
+              }
+            </p>
+          </div>
+
+          {/* Photo indicator dots */}
+          {capturedPhotos.length > 1 && !showError && (
+            <div className="flex gap-2 mt-6">
+              {capturedPhotos.map((_, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "w-2 h-2 rounded-full transition-all duration-300",
+                    i === displayPhotoIndex ? "bg-primary w-6" : "bg-muted-foreground/30"
+                  )}
+                />
+              ))}
             </div>
           )}
 
-          {capturedPhotos.length > 1 && !showError && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
-              <div className="flex gap-1.5">
-                {capturedPhotos.map((_, i) => (
-                  <div 
-                    key={i}
-                    className={cn(
-                      "w-2 h-2 rounded-full transition-all",
-                      i === displayPhotoIndex ? "bg-primary w-4" : "bg-white/50"
-                    )}
-                  />
-                ))}
-              </div>
-            </div>
+          {usedSinglePhoto && !showError && (
+            <p className="text-xs text-muted-foreground mt-4">
+              Using primary photo for faster analysis
+            </p>
           )}
         </div>
       </div>
@@ -314,54 +316,38 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
 
       {/* Progress Section - hide on error */}
       {!showError && (
-        <div className="mt-6 max-w-md mx-auto w-full">
-          <ProgressBar progress={progress} className="mb-6" />
+        <div className="mt-8 max-w-md mx-auto w-full">
+          <ProgressBar progress={progress} className="mb-4" />
 
-          <div className="glass-panel p-4">
-            <div className="flex flex-col gap-2">
-              {SCAN_STEPS.map((step, index) => {
-                const Icon = step.icon;
-                const isActive = index === currentStep;
-                const isComplete = index < currentStep;
-                
-                return (
-                  <div 
-                    key={step.label}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-300",
-                      isActive && "bg-primary/10",
-                      isComplete && "opacity-50"
-                    )}
-                  >
-                    <Icon className={cn(
-                      "w-4 h-4 transition-colors",
-                      isActive ? "text-primary" : "text-muted-foreground"
-                    )} />
-                    <span className={cn(
-                      "text-sm transition-colors",
-                      isActive ? "text-foreground font-medium" : "text-muted-foreground"
-                    )}>
-                      {step.label}
-                    </span>
-                    {isComplete && (
-                      <span className="ml-auto text-xs text-success">✓</span>
-                    )}
-                    {isActive && (
-                      <span className="ml-auto">
-                        <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse" />
-                      </span>
+          {/* Step indicators */}
+          <div className="flex justify-between px-2">
+            {SCAN_STEPS.map((step, index) => {
+              const isComplete = index < currentStep;
+              const isActive = index === currentStep;
+              return (
+                <div key={step.label} className="flex flex-col items-center">
+                  <div className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                    isComplete ? "bg-primary text-primary-foreground" :
+                    isActive ? "bg-primary/20 text-primary border-2 border-primary" :
+                    "bg-secondary text-muted-foreground"
+                  )}>
+                    {isComplete ? (
+                      <span className="text-xs">✓</span>
+                    ) : (
+                      <span className="text-xs font-medium">{index + 1}</span>
                     )}
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Fallback notice */}
           {usedFallback && analysisComplete && (
             <div className="mt-4 p-3 rounded-lg bg-warning/10 border border-warning/30">
               <p className="text-xs text-center text-warning-foreground">
-                ⚠️ Fallback demo result (AI unavailable)
+                Demo result shown (AI unavailable)
               </p>
             </div>
           )}
