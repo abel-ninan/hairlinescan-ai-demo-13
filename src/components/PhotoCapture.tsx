@@ -1,6 +1,6 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Camera, RotateCcw, Check, X } from "lucide-react";
+import { Camera, RotateCcw, Check } from "lucide-react";
 
 interface PhotoCaptureProps {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -10,6 +10,8 @@ interface PhotoCaptureProps {
   onRetake: () => void;
   onUse: () => void;
   hasCamera: boolean;
+  onScanStart?: () => void;
+  onScanEnd?: () => void;
 }
 
 export const PhotoCapture = ({
@@ -20,10 +22,13 @@ export const PhotoCapture = ({
   onRetake,
   onUse,
   hasCamera,
+  onScanStart,
+  onScanEnd,
 }: PhotoCaptureProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isScanning, setIsScanning] = useState(false);
 
-  const capturePhoto = useCallback(() => {
+  const performCapture = useCallback(() => {
     if (!videoRef.current || !canvasRef.current) return;
 
     const video = videoRef.current;
@@ -52,6 +57,18 @@ export const PhotoCapture = ({
     const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
     onCapture(dataUrl);
   }, [videoRef, facingMode, onCapture]);
+
+  const capturePhoto = useCallback(() => {
+    setIsScanning(true);
+    onScanStart?.();
+
+    // Run scanning animation for 1.2 seconds before capturing
+    setTimeout(() => {
+      performCapture();
+      setIsScanning(false);
+      onScanEnd?.();
+    }, 1200);
+  }, [performCapture, onScanStart, onScanEnd]);
 
   return (
     <>
@@ -90,14 +107,23 @@ export const PhotoCapture = ({
           </div>
         </div>
       ) : (
-        <Button 
-          variant="scanner" 
+        <Button
+          variant="scanner"
           className="w-full"
           onClick={capturePhoto}
-          disabled={!hasCamera}
+          disabled={!hasCamera || isScanning}
         >
-          <Camera className="w-4 h-4" />
-          Capture Photo
+          {isScanning ? (
+            <>
+              <span className="inline-block w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+              Scanning...
+            </>
+          ) : (
+            <>
+              <Camera className="w-4 h-4" />
+              Capture Photo
+            </>
+          )}
         </Button>
       )}
     </>

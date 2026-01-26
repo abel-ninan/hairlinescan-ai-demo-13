@@ -10,7 +10,7 @@ interface MetricCardProps {
 
 export const MetricCard = ({ label, value, subtext, className, delay = 0 }: MetricCardProps) => {
   return (
-    <div 
+    <div
       className={cn(
         "glass-panel p-4 text-center opacity-0 animate-fade-up",
         className
@@ -18,7 +18,7 @@ export const MetricCard = ({ label, value, subtext, className, delay = 0 }: Metr
       style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}
     >
       <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
-      <p className="font-mono text-xl font-semibold text-foreground">{value}</p>
+      <p className="font-mono text-lg font-medium text-foreground">{value}</p>
       {subtext && (
         <p className="text-xs text-muted-foreground mt-1">{subtext}</p>
       )}

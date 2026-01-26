@@ -8,7 +8,7 @@ interface RiskGaugeProps {
 export const RiskGauge = ({ score, className }: RiskGaugeProps) => {
   const normalizedScore = Math.max(0, Math.min(10, score));
   const percentage = (normalizedScore / 10) * 100;
-  
+
   const getColor = () => {
     if (normalizedScore <= 3) return "text-success";
     if (normalizedScore <= 6) return "text-warning";
@@ -17,14 +17,14 @@ export const RiskGauge = ({ score, className }: RiskGaugeProps) => {
 
   const getLabel = () => {
     if (normalizedScore <= 3) return "Low Risk";
-    if (normalizedScore <= 6) return "Moderate Risk";
-    return "Elevated Risk";
+    if (normalizedScore <= 6) return "Moderate";
+    return "Elevated";
   };
 
   return (
     <div className={cn("text-center", className)}>
       {/* Circular gauge */}
-      <div className="relative w-48 h-48 mx-auto mb-4">
+      <div className="relative w-44 h-44 mx-auto mb-4">
         <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
           {/* Background circle */}
           <circle
@@ -33,7 +33,7 @@ export const RiskGauge = ({ score, className }: RiskGaugeProps) => {
             r="42"
             fill="none"
             stroke="hsl(var(--secondary))"
-            strokeWidth="8"
+            strokeWidth="6"
           />
           {/* Progress circle */}
           <circle
@@ -42,10 +42,10 @@ export const RiskGauge = ({ score, className }: RiskGaugeProps) => {
             r="42"
             fill="none"
             stroke="url(#gaugeGradient)"
-            strokeWidth="8"
+            strokeWidth="6"
             strokeLinecap="round"
             strokeDasharray={`${percentage * 2.64} 264`}
-            className="transition-all duration-1000 ease-out"
+            className="transition-all duration-700 ease-out"
           />
           <defs>
             <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -57,17 +57,17 @@ export const RiskGauge = ({ score, className }: RiskGaugeProps) => {
         </svg>
         {/* Center content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={cn("font-mono text-5xl font-bold", getColor())}>
+          <span className={cn("font-mono text-4xl font-semibold", getColor())}>
             {normalizedScore.toFixed(1)}
           </span>
-          <span className="text-sm text-muted-foreground">/10</span>
+          <span className="text-xs text-muted-foreground">/10</span>
         </div>
       </div>
-      
+
       {/* Label */}
-      <div className={cn("inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/50 border border-border", getColor())}>
-        <div className={cn("w-2 h-2 rounded-full animate-pulse", 
-          normalizedScore <= 3 ? "bg-success" : 
+      <div className={cn("inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary border border-border text-sm", getColor())}>
+        <div className={cn("w-1.5 h-1.5 rounded-full",
+          normalizedScore <= 3 ? "bg-success" :
           normalizedScore <= 6 ? "bg-warning" : "bg-destructive"
         )} />
         <span className="font-medium">{getLabel()}</span>

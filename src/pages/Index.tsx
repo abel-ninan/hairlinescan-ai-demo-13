@@ -78,10 +78,11 @@ const Index = () => {
         />
       )}
       {screen === "results" && (
-        <ResultsScreen 
-          score={riskScore} 
+        <ResultsScreen
+          score={riskScore}
           analysis={analysisResult}
-          onRestart={handleRestart} 
+          onRestart={handleRestart}
+          photo={analysisData?.photos?.front}
         />
       )}
     </main>

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { ProgressBar } from "@/components/ProgressBar";
-import { DemoBadge } from "@/components/DemoBadge";
 import { ScannerOverlay } from "@/components/ScannerOverlay";
 import { Activity, MapPin, AlertCircle, FileText, RefreshCw, ImageOff, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -209,11 +208,10 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4">
         <h2 className="text-lg font-semibold text-foreground">
           {showError ? errorConfig?.title || "Analysis Error" : "Analyzing..."}
         </h2>
-        <DemoBadge />
       </div>
 
       {/* Scanner Frame with Captured Photo */}
@@ -231,19 +229,19 @@ export const ScanningScreen = ({ onComplete, onCancel, photos, questionnaire }: 
           
           {!showError && <ScannerOverlay isScanning={true} />}
 
-          <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10">
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
             <div className={cn(
-              "px-4 py-2 rounded-full backdrop-blur-sm border",
-              showError 
-                ? "bg-destructive/90 border-destructive/50"
-                : "bg-primary/90 border-primary/50 animate-pulse"
+              "px-4 py-2 rounded-full border",
+              showError
+                ? "bg-destructive text-destructive-foreground"
+                : "bg-primary text-primary-foreground"
             )}>
-              <p className="text-sm text-primary-foreground font-medium">
-                {showError 
+              <p className="text-sm font-medium">
+                {showError
                   ? errorConfig?.title || "Error"
-                  : analysisComplete 
-                    ? 'Finalizing...' 
-                    : 'AI Analysis in progress...'
+                  : analysisComplete
+                    ? 'Finalizing...'
+                    : 'Analyzing...'
                 }
               </p>
             </div>

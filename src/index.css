@@ -6,56 +6,51 @@
 
 @layer base {
   :root {
-    --background: 220 20% 6%;
+    --background: 220 25% 7%;
     --foreground: 210 40% 98%;
 
-    --card: 220 20% 10%;
+    --card: 220 25% 11%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 220 20% 10%;
+    --popover: 220 25% 11%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 175 80% 50%;
-    --primary-foreground: 220 20% 6%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 220 25% 7%;
 
-    --secondary: 220 20% 14%;
+    --secondary: 220 25% 15%;
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 220 15% 18%;
-    --muted-foreground: 215 20% 55%;
+    --muted: 220 20% 18%;
+    --muted-foreground: 215 20% 60%;
 
-    --accent: 175 60% 40%;
+    --accent: 217 80% 50%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
 
-    --success: 142 76% 46%;
-    --success-foreground: 220 20% 6%;
+    --success: 152 69% 45%;
+    --success-foreground: 220 25% 7%;
 
     --warning: 38 92% 50%;
-    --warning-foreground: 220 20% 6%;
+    --warning-foreground: 220 25% 7%;
 
-    --border: 220 15% 18%;
-    --input: 220 15% 18%;
-    --ring: 175 80% 50%;
+    --border: 220 20% 20%;
+    --input: 220 20% 18%;
+    --ring: 217 91% 60%;
 
-    --radius: 0.75rem;
+    --radius: 0.875rem;
 
     /* Custom scanner colors */
-    --scan-glow: 175 80% 50%;
-    --scan-line: 175 90% 60%;
-    --glass-bg: 220 20% 8% / 0.8;
-    --glass-border: 220 15% 25% / 0.5;
+    --scan-glow: 217 91% 60%;
+    --scan-line: 217 91% 65%;
+    --glass-bg: 220 25% 9% / 0.9;
+    --glass-border: 220 20% 25%;
 
-    /* Gradients */
-    --gradient-scanner: linear-gradient(180deg, hsl(175 80% 50% / 0.2) 0%, transparent 100%);
-    --gradient-card: linear-gradient(135deg, hsl(220 20% 12%) 0%, hsl(220 20% 8%) 100%);
-    --gradient-glow: radial-gradient(circle at center, hsl(175 80% 50% / 0.15) 0%, transparent 70%);
-
-    /* Shadows */
-    --shadow-glow: 0 0 40px hsl(175 80% 50% / 0.3);
-    --shadow-card: 0 8px 32px hsl(220 20% 4% / 0.5);
+    /* Shadows - more subtle */
+    --shadow-glow: 0 0 30px hsl(217 91% 60% / 0.15);
+    --shadow-card: 0 4px 20px hsl(220 25% 4% / 0.4);
 
     /* Fonts */
     --font-display: 'Outfit', sans-serif;
@@ -63,7 +58,7 @@
   }
 
   .dark {
-    --background: 220 20% 6%;
+    --background: 220 25% 7%;
     --foreground: 210 40% 98%;
   }
 }
@@ -79,19 +74,19 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    background-image: radial-gradient(circle at 50% 0%, hsl(175 80% 50% / 0.05) 0%, transparent 50%);
+    background-image: radial-gradient(ellipse at 50% 0%, hsl(217 91% 60% / 0.03) 0%, transparent 60%);
     min-height: 100vh;
   }
 }
 
 @layer components {
   .glass-panel {
-    @apply bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl;
+    @apply bg-card/95 backdrop-blur-md border border-border rounded-2xl;
     box-shadow: var(--shadow-card);
   }
 
   .glass-button {
-    @apply bg-secondary/80 backdrop-blur-sm border border-border/50 hover:bg-secondary transition-all duration-300;
+    @apply bg-secondary backdrop-blur-sm border border-border hover:bg-secondary/80 transition-all duration-200;
   }
 
   .scanner-glow {
@@ -107,7 +102,7 @@
   }
 
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-400;
   }
 }
 
@@ -115,19 +110,25 @@
   /* Scan line animation */
   @keyframes scan-line {
     0%, 100% { transform: translateY(-100%); opacity: 0; }
-    10% { opacity: 1; }
-    90% { opacity: 1; }
+    10% { opacity: 0.8; }
+    90% { opacity: 0.8; }
     100% { transform: translateY(100%); opacity: 0; }
   }
 
-  @keyframes pulse-glow {
-    0%, 100% { opacity: 0.5; }
-    50% { opacity: 1; }
+  @keyframes scan-vertical {
+    0% { top: 0; }
+    50% { top: 100%; }
+    100% { top: 0; }
   }
 
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
+  @keyframes face-scan {
+    0% { top: 0%; }
+    100% { top: 100%; }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.7; }
   }
 
   @keyframes shimmer {
@@ -136,44 +137,48 @@
   }
 
   @keyframes fade-up {
-    from { opacity: 0; transform: translateY(20px); }
+    from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: translateY(0); }
   }
 
   @keyframes scale-in {
-    from { opacity: 0; transform: scale(0.9); }
+    from { opacity: 0; transform: scale(0.95); }
     to { opacity: 1; transform: scale(1); }
   }
 
   .animate-scan-line {
-    animation: scan-line 2.5s ease-in-out infinite;
+    animation: scan-line 2s ease-in-out infinite;
+  }
+
+  .animate-scan-vertical {
+    animation: scan-vertical 1s ease-in-out infinite;
+  }
+
+  .animate-face-scan {
+    animation: face-scan 1.2s ease-in-out infinite;
   }
 
   .animate-pulse-glow {
-    animation: pulse-glow 2s ease-in-out infinite;
-  }
-
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
+    animation: pulse-glow 2.5s ease-in-out infinite;
   }
 
   .animate-shimmer {
-    background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.3), transparent);
+    background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.2), transparent);
     background-size: 200% 100%;
     animation: shimmer 2s linear infinite;
   }
 
   .animate-fade-up {
-    animation: fade-up 0.5s ease-out forwards;
+    animation: fade-up 0.35s ease-out forwards;
   }
 
   .animate-scale-in {
-    animation: scale-in 0.3s ease-out forwards;
+    animation: scale-in 0.25s ease-out forwards;
   }
 
+  .delay-75 { animation-delay: 75ms; }
   .delay-100 { animation-delay: 100ms; }
+  .delay-150 { animation-delay: 150ms; }
   .delay-200 { animation-delay: 200ms; }
   .delay-300 { animation-delay: 300ms; }
-  .delay-400 { animation-delay: 400ms; }
-  .delay-500 { animation-delay: 500ms; }
 }

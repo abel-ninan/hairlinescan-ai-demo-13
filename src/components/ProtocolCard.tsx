@@ -21,28 +21,28 @@ export const ProtocolCard = ({
   delay = 0 
 }: ProtocolCardProps) => {
   const tagColors = {
-    primary: "bg-primary/20 text-primary border-primary/30",
-    warning: "bg-warning/20 text-warning border-warning/30",
-    success: "bg-success/20 text-success border-success/30",
+    primary: "bg-primary/10 text-primary",
+    warning: "bg-warning/10 text-warning",
+    success: "bg-success/10 text-success",
   };
 
   return (
-    <div 
+    <div
       className={cn(
-        "glass-panel p-5 opacity-0 animate-fade-up hover:border-primary/30 transition-all duration-300",
+        "glass-panel p-4 opacity-0 animate-fade-up transition-colors duration-200",
         className
       )}
       style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}
     >
-      <div className="flex items-start gap-4">
-        <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20">
-          <Icon className="w-5 h-5 text-primary" />
+      <div className="flex items-start gap-3">
+        <div className="p-2 rounded-lg bg-primary/10">
+          <Icon className="w-4 h-4 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1.5">
-            <h3 className="font-semibold text-foreground">{title}</h3>
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-medium text-foreground text-sm">{title}</h3>
             {tag && (
-              <span className={cn("text-xs px-2 py-0.5 rounded-full border", tagColors[tagColor])}>
+              <span className={cn("text-xs px-2 py-0.5 rounded-full", tagColors[tagColor])}>
                 {tag}
               </span>
             )}
