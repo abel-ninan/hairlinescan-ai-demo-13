@@ -1,7 +1,6 @@
 import { useRef, useState, useEffect, useCallback, MutableRefObject } from "react";
 import { Button } from "@/components/ui/button";
 import { ScannerOverlay } from "@/components/ScannerOverlay";
-import { DemoBadge } from "@/components/DemoBadge";
 import { Camera, SwitchCamera, X } from "lucide-react";
 
 interface CameraScreenProps {
@@ -172,10 +171,6 @@ export const CameraScreen = ({ onStartScan, onCancel, streamRef }: CameraScreenP
         </Button>
       </div>
 
-      {/* Demo badge */}
-      <div className="mt-4 flex justify-center">
-        <DemoBadge />
-      </div>
     </div>
   );
 };
