@@ -1,13 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-// Allowed origins for CORS - add your production domain here
+// Allowed origins for CORS
 const ALLOWED_ORIGINS = [
-  "capacitor://localhost",      // iOS app
-  "http://localhost",           // iOS app fallback
+  "capacitor://localhost",      // iOS app (required for Capacitor)
+  "http://localhost",           // iOS app WebView fallback
   "http://localhost:5173",      // Local dev server
-  "http://localhost:8100",      // Capacitor dev
-  // Add your production domain when deployed:
-  // "https://yourdomain.com",
+  "http://localhost:8100",      // Capacitor dev server
+  "https://euztyowduyplbduzcgct.supabase.co", // Supabase project
 ];
 
 // Simple in-memory rate limiting (resets on function cold start)
