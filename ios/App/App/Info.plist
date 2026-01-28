@@ -23,7 +23,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSApplicationCategoryType</key>
-	<string>public.app-category.healthcare-fitness</string>
+	<string>public.app-category.entertainment</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>
@@ -44,11 +44,11 @@
 		</dict>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>HairlineScan needs camera access to capture photos of your hairline for AI analysis.</string>
+	<string>HairlineScan uses your camera to take fun selfies for entertainment analysis. Photos are not stored.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>HairlineScan needs access to save photos to your library.</string>
+	<string>HairlineScan can save your selfies to your photo library if you choose.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>HairlineScan needs photo library access to save and retrieve hairline photos.</string>
+	<string>HairlineScan can access your photos if you want to save or share results.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

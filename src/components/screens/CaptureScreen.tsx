@@ -160,9 +160,9 @@ export const CaptureScreen = ({ onAnalyze, onCancel, streamRef }: CaptureScreenP
   }, []);
 
   const stepLabels: Record<PhotoType, string> = {
-    front: "Front Hairline",
-    left: "Left Temple", 
-    right: "Right Temple"
+    front: "Front View",
+    left: "Left Side",
+    right: "Right Side"
   };
 
   return (
@@ -276,7 +276,7 @@ export const CaptureScreen = ({ onAnalyze, onCancel, streamRef }: CaptureScreenP
             className="mt-0.5"
           />
           <Label htmlFor="consent" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
-            I understand this is not medical advice and is a non-diagnostic estimate.
+            I understand this is for entertainment only, not medical advice. Results are just for fun!
           </Label>
         </div>
       </div>

@@ -75,10 +75,11 @@ function safeJsonParse(text: string) {
 }
 
 const systemText = `
-You are an educational assistant about hair/scalp appearance.
-Non-diagnostic only. Use hedging language ("may", "could", "appears to").
+You are a fun entertainment assistant that comments on hair styles.
+This is purely for fun/entertainment - NOT medical or diagnostic.
+Use playful hedging language ("looks like", "seems to have", "appears to be").
 Return ONLY JSON. No markdown. No extra text.
-Keep it SHORT.
+Keep it SHORT and FUN.
 `.trim();
 
 serve(async (req) => {
@@ -135,16 +136,16 @@ serve(async (req) => {
       `Return ONLY ONE LINE of MINIFIED JSON. No markdown. No extra text.
 Keys must be EXACTLY: score, confidence, summary, tags, hairline_type, hairline_description, personalized_tips
 Rules:
-- score: 0-10 number (0=severe loss, 10=no loss)
+- score: 0-10 number (style score for fun)
 - confidence: 0-1 number
-- summary: <= 120 chars
-- tags: array of 1-3 very short strings
-- hairline_type: specific type e.g. "Widow's Peak", "Mature Hairline", "Receding Temples", "M-shaped", "Straight", "Rounded"
-- hairline_description: 1 sentence explaining what this hairline type means
-- personalized_tips: array of 3 specific tips for THIS hairline type, not generic advice
+- summary: <= 120 chars, fun and encouraging
+- tags: array of 1-3 fun descriptive strings about the look
+- hairline_type: style type e.g. "Classic", "Distinguished", "Youthful", "Mature", "Unique", "Sharp"
+- hairline_description: 1 fun sentence about this style
+- personalized_tips: array of 3 fun style tips (NOT medical), like hair styling or grooming
 STOP AFTER THE FINAL }.
 
-AgeRange:${answers?.ageRange || "NA"} Timeframe:${answers?.timeframe || "NA"} Family:${answers?.familyHistory || "NA"} Shedding:${answers?.shedding || "NA"} Scalp:${answers?.scalpIssues || "NA"}`;
+Age:${answers?.ageRange || "NA"} Style:${answers?.timeframe || "NA"} Family:${answers?.familyHistory || "NA"} Routine:${answers?.shedding || "NA"} Care:${answers?.scalpIssues || "NA"}`;
 
     // IMPORTANT: no responseSchema/responseJsonSchema at all (prevents 400s)
     const body = {
@@ -213,7 +214,7 @@ AgeRange:${answers?.ageRange || "NA"} Timeframe:${answers?.timeframe || "NA"} Fa
     // Expand to your full UI schema (simple, stable)
     const score = Math.max(0, Math.min(10, Number(mini.score ?? 5)));
     const confidence = Math.max(0, Math.min(1, Number(mini.confidence ?? 0.5)));
-    const summary = String(mini.summary ?? "Educational estimate based on the photo provided.").slice(0, 260);
+    const summary = String(mini.summary ?? "Fun analysis of your look!").slice(0, 260);
     const tags = Array.isArray(mini.tags) ? mini.tags.map(String).slice(0, 3) : [];
     const hairlineType = mini.hairline_type ? String(mini.hairline_type) : undefined;
     const hairlineDescription = mini.hairline_description ? String(mini.hairline_description) : undefined;
@@ -226,22 +227,17 @@ AgeRange:${answers?.ageRange || "NA"} Timeframe:${answers?.timeframe || "NA"} Fa
       confidence,
       summary,
       observations: [
-        ...(tags.map((t: string) => `Photo may suggest: ${t}.`)),
-        "Lighting/angle can affect how dense the hair appears in photos.",
+        ...(tags.map((t: string) => `Your look: ${t}`)),
+        "Lighting and angle can affect how your style appears in photos.",
       ].slice(0, 4),
-      likely_patterns: tags.length ? tags : ["Temple recession may be present", "Hairline density may vary with lighting"],
+      likely_patterns: tags.length ? tags : ["Natural style", "Unique look"],
       general_options: [
-        { title: "Basics", bullets: ["Consistent monthly photos (same lighting/angle).", "Sleep, protein, stress management.", "Avoid traction/harsh styling if relevant."] },
-        { title: "Common options (educational)", bullets: ["Topical minoxidil is commonly discussed.", "Ketoconazole shampoo is used by some for scalp health.", "Microneedling is discussed by some users (be cautious)."] },
-        { title: "When to escalate", bullets: ["Rapid changes or irritation.", "If you want diagnosis/personal plan.", "Bring your photo timeline to a dermatologist."] },
+        { title: "Style Tips", bullets: ["Take photos in consistent lighting for comparison.", "Good hair care starts with a healthy routine.", "Find a style that works for you!"] },
+        { title: "Hair Care Basics", bullets: ["Use quality shampoo and conditioner.", "Protect your hair from heat damage.", "Stay hydrated and eat well."] },
       ],
-      when_to_see_a_dermatologist: [
-        "Sudden or rapidly worsening shedding over weeks.",
-        "Patchy loss, pain, redness, significant flaking/itch.",
-        "Any concern where you want diagnosis/treatment guidance.",
-      ],
+      when_to_see_a_dermatologist: [],
       disclaimer:
-        "Educational only — not medical advice or a diagnosis. Photo-based observations are limited. Consult a board-certified dermatologist for concerns.",
+        "Entertainment only — this is just for fun! Not medical advice. See a professional for any real concerns.",
       hairline_type: hairlineType,
       hairline_description: hairlineDescription,
       personalized_tips: personalizedTips,

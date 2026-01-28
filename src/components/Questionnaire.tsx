@@ -27,12 +27,12 @@ export const Questionnaire = ({ data, onChange }: QuestionnaireProps) => {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold text-foreground">Quick Assessment</h3>
-      
+      <h3 className="text-sm font-semibold text-foreground">Tell Us About You</h3>
+
       <div className="space-y-3">
         {/* Age Range */}
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Age Range</Label>
+          <Label className="text-xs text-muted-foreground">Your Age</Label>
           <Select value={data.ageRange} onValueChange={(v) => handleChange("ageRange", v)}>
             <SelectTrigger className="h-9 bg-secondary/50 border-border/50">
               <SelectValue placeholder="Select age range" />
@@ -49,61 +49,61 @@ export const Questionnaire = ({ data, onChange }: QuestionnaireProps) => {
 
         {/* Timeframe */}
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Noticing changes for</Label>
+          <Label className="text-xs text-muted-foreground">How long have you had this hairstyle?</Label>
           <Select value={data.timeframe} onValueChange={(v) => handleChange("timeframe", v)}>
             <SelectTrigger className="h-9 bg-secondary/50 border-border/50">
               <SelectValue placeholder="Select timeframe" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="weeks">Weeks</SelectItem>
-              <SelectItem value="months">Months</SelectItem>
+              <SelectItem value="weeks">A few weeks</SelectItem>
+              <SelectItem value="months">Several months</SelectItem>
               <SelectItem value="years">Years</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {/* Family History */}
+        {/* Hair Type */}
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Family history of hair loss</Label>
+          <Label className="text-xs text-muted-foreground">Hair type in your family</Label>
           <Select value={data.familyHistory} onValueChange={(v) => handleChange("familyHistory", v)}>
             <SelectTrigger className="h-9 bg-secondary/50 border-border/50">
               <SelectValue placeholder="Select option" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="yes">Yes</SelectItem>
-              <SelectItem value="no">No</SelectItem>
-              <SelectItem value="unsure">Unsure</SelectItem>
+              <SelectItem value="yes">Similar to mine</SelectItem>
+              <SelectItem value="no">Different from mine</SelectItem>
+              <SelectItem value="unsure">Not sure</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {/* Shedding */}
+        {/* Styling */}
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Daily hair shedding</Label>
+          <Label className="text-xs text-muted-foreground">How often do you style your hair?</Label>
           <Select value={data.shedding} onValueChange={(v) => handleChange("shedding", v)}>
             <SelectTrigger className="h-9 bg-secondary/50 border-border/50">
-              <SelectValue placeholder="Select level" />
+              <SelectValue placeholder="Select frequency" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="low">Low (minimal)</SelectItem>
-              <SelectItem value="medium">Medium (noticeable)</SelectItem>
-              <SelectItem value="high">High (significant)</SelectItem>
+              <SelectItem value="low">Rarely</SelectItem>
+              <SelectItem value="medium">Sometimes</SelectItem>
+              <SelectItem value="high">Daily</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {/* Scalp Issues */}
+        {/* Hair Care */}
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Scalp conditions</Label>
+          <Label className="text-xs text-muted-foreground">Your hair care routine</Label>
           <Select value={data.scalpIssues} onValueChange={(v) => handleChange("scalpIssues", v)}>
             <SelectTrigger className="h-9 bg-secondary/50 border-border/50">
-              <SelectValue placeholder="Select condition" />
+              <SelectValue placeholder="Select routine" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              <SelectItem value="itch">Itchiness</SelectItem>
-              <SelectItem value="flaking">Flaking/Dandruff</SelectItem>
-              <SelectItem value="redness">Redness</SelectItem>
+              <SelectItem value="none">Basic (shampoo only)</SelectItem>
+              <SelectItem value="itch">Moderate (shampoo + conditioner)</SelectItem>
+              <SelectItem value="flaking">Extensive (multiple products)</SelectItem>
+              <SelectItem value="redness">Professional treatments</SelectItem>
             </SelectContent>
           </Select>
         </div>

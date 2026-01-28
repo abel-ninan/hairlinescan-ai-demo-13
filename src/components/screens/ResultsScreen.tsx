@@ -5,7 +5,6 @@ import {
   RotateCcw,
   Sun,
   Droplets,
-  Stethoscope,
   Share2,
   Download,
   AlertTriangle,
@@ -13,10 +12,10 @@ import {
   Sparkles,
   User,
   Check,
-  Pill,
   Leaf,
   Eye,
   ChevronRight,
+  Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -76,21 +75,13 @@ const MetricRow = ({ label, value, delay = 0 }: MetricRowProps) => {
   );
 };
 
-// Medical treatments data
-const medicalTreatments = [
-  { name: "Minoxidil", description: "FDA-approved topical that may slow loss and stimulate regrowth" },
-  { name: "Finasteride", description: "Prescription oral medication that blocks DHT hormone" },
-  { name: "Ketoconazole Shampoo", description: "Anti-fungal shampoo that may support scalp health" },
-  { name: "Spironolactone", description: "Prescription option sometimes used for hormonal hair loss" },
-];
-
-// Holistic treatments data
-const holisticTreatments = [
-  { name: "Red Light Therapy", description: "Low-level laser therapy (LLLT) to stimulate follicles" },
-  { name: "Microneedling", description: "Derma rolling to boost blood flow and absorption" },
-  { name: "Castor Oil", description: "Natural oil that may nourish and strengthen hair" },
-  { name: "Scalp Massage", description: "Regular massage to improve circulation" },
-  { name: "Biotin Supplements", description: "B-vitamin that supports hair, skin, and nail health" },
+// Hair care tips (general wellness, not medical)
+const hairCareTips = [
+  { name: "Gentle Shampoo", description: "Use sulfate-free products to reduce scalp irritation" },
+  { name: "Scalp Massage", description: "Regular massage may improve circulation" },
+  { name: "Balanced Diet", description: "Eat protein-rich foods and stay hydrated" },
+  { name: "Reduce Heat Styling", description: "Minimize heat damage from dryers and styling tools" },
+  { name: "Sun Protection", description: "Protect your scalp from sun exposure" },
 ];
 
 export const ResultsScreen = ({ score, analysis, onRestart, photo }: ResultsScreenProps) => {
@@ -136,7 +127,7 @@ export const ResultsScreen = ({ score, analysis, onRestart, photo }: ResultsScre
 
     setIsSharing(true);
     try {
-      const shareText = `My HairlineScan Results:\n\nOverall Score: ${Math.round((10 - (analysis?.score ?? score)) * 10)}%\n${analysis?.hairline_type ? `Hairline Type: ${analysis.hairline_type}\n` : ''}${analysis?.summary || ''}\n\nAnalyzed with HairlineScan`;
+      const shareText = `My HairlineScan Fun Results:\n\nStyle Score: ${Math.round((10 - (analysis?.score ?? score)) * 10)}%\n${analysis?.hairline_type ? `Style: ${analysis.hairline_type}\n` : ''}\nJust for fun - not medical advice!\n\nTry HairlineScan for entertainment`;
 
       if (navigator.share) {
         await navigator.share({
@@ -273,16 +264,27 @@ export const ResultsScreen = ({ score, analysis, onRestart, photo }: ResultsScre
               </div>
             ) : (
               <>
+                {/* Entertainment Disclaimer Banner */}
+                <div className="glass-panel p-3 mb-4 bg-amber-500/10 border border-amber-500/30 opacity-0 animate-fade-up" style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}>
+                  <div className="flex items-center gap-2 justify-center">
+                    <Info className="w-4 h-4 text-amber-500" />
+                    <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                      For Entertainment Only - Not Medical Advice
+                    </span>
+                  </div>
+                </div>
+
                 {/* Metrics Card */}
                 {metrics && (
                   <div className="glass-panel p-6 mb-6 space-y-6">
+                    <p className="text-xs text-center text-muted-foreground mb-2">Fun scores for entertainment</p>
                     <div className="grid grid-cols-2 gap-x-6 gap-y-6">
-                      <MetricRow label="Overall" value={metrics.overall} delay={0} />
+                      <MetricRow label="Style Score" value={metrics.overall} delay={0} />
                       <MetricRow label="Potential" value={metrics.potential} delay={50} />
-                      <MetricRow label="Density" value={metrics.density} delay={100} />
-                      <MetricRow label="Thickness" value={metrics.thickness} delay={150} />
-                      <MetricRow label="Hairline" value={metrics.hairline} delay={200} />
-                      <MetricRow label="Scalp Health" value={metrics.scalp} delay={250} />
+                      <MetricRow label="Fullness" value={metrics.density} delay={100} />
+                      <MetricRow label="Volume" value={metrics.thickness} delay={150} />
+                      <MetricRow label="Shape" value={metrics.hairline} delay={200} />
+                      <MetricRow label="Condition" value={metrics.scalp} delay={250} />
                     </div>
                   </div>
                 )}
@@ -393,86 +395,50 @@ export const ResultsScreen = ({ score, analysis, onRestart, photo }: ResultsScre
                 </div>
               )}
 
-              {/* Medical & Chemical Section */}
+              {/* Hair Care Tips Section */}
               <div
                 className="opacity-0 animate-fade-up"
                 style={{ animationDelay: '150ms', animationFillMode: 'forwards' }}
               >
                 <div className="flex items-center gap-2 mb-3">
-                  <Pill className="w-4 h-4 text-blue-400" />
-                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Medical & Chemical</h3>
-                </div>
-                <div className="glass-panel overflow-hidden">
-                  {medicalTreatments.map((treatment, i) => (
-                    <div
-                      key={treatment.name}
-                      className={cn(
-                        "p-4 flex items-center gap-4",
-                        i !== medicalTreatments.length - 1 && "border-b border-border/50"
-                      )}
-                    >
-                      <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                        <Droplets className="w-5 h-5 text-blue-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-medium text-foreground">{treatment.name}</h4>
-                        <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{treatment.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Holistic Section */}
-              <div
-                className="opacity-0 animate-fade-up"
-                style={{ animationDelay: '225ms', animationFillMode: 'forwards' }}
-              >
-                <div className="flex items-center gap-2 mb-3">
                   <Leaf className="w-4 h-4 text-green-400" />
-                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Holistic</h3>
+                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Hair Care Tips</h3>
                 </div>
                 <div className="glass-panel overflow-hidden">
-                  {holisticTreatments.map((treatment, i) => (
+                  {hairCareTips.map((tip, i) => (
                     <div
-                      key={treatment.name}
+                      key={tip.name}
                       className={cn(
                         "p-4 flex items-center gap-4",
-                        i !== holisticTreatments.length - 1 && "border-b border-border/50"
+                        i !== hairCareTips.length - 1 && "border-b border-border/50"
                       )}
                     >
                       <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
                         <Sun className="w-5 h-5 text-green-400" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-medium text-foreground">{treatment.name}</h4>
-                        <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{treatment.description}</p>
+                        <h4 className="text-sm font-medium text-foreground">{tip.name}</h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{tip.description}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* When to See a Dermatologist */}
-              {analysis?.when_to_see_a_dermatologist && analysis.when_to_see_a_dermatologist.length > 0 && (
-                <div
-                  className="opacity-0 animate-fade-up"
-                  style={{ animationDelay: '300ms', animationFillMode: 'forwards' }}
-                >
-                  <div className="flex items-center gap-2 mb-3">
-                    <Stethoscope className="w-4 h-4 text-red-400" />
-                    <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">See a Dermatologist If</h3>
-                  </div>
-                  <div className="glass-panel p-4 border-l-2 border-l-red-400/50 space-y-2">
-                    {analysis.when_to_see_a_dermatologist.map((reason, j) => (
-                      <div key={j} className="flex items-start gap-3">
-                        <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-foreground leading-relaxed">{reason}</p>
-                      </div>
-                    ))}
+              {/* Professional Advice Note */}
+              <div
+                className="opacity-0 animate-fade-up"
+                style={{ animationDelay: '225ms', animationFillMode: 'forwards' }}
+              >
+                <div className="glass-panel p-4 bg-blue-500/5 border border-blue-500/20">
+                  <div className="flex items-start gap-3">
+                    <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      <strong>Note:</strong> For any concerns about your hair or scalp, please consult a licensed dermatologist or healthcare professional. This app is for entertainment purposes only.
+                    </p>
                   </div>
                 </div>
-              )}
+              </div>
 
             </div>
           </>
@@ -492,9 +458,11 @@ export const ResultsScreen = ({ score, analysis, onRestart, photo }: ResultsScre
         </div>
 
         {/* Disclaimer */}
-        <p className="mt-4 text-xs text-muted-foreground/70 text-center">
-          For informational purposes only. Not medical advice.
-        </p>
+        <div className="mt-4 p-3 rounded-lg bg-secondary/50 border border-border">
+          <p className="text-xs text-muted-foreground text-center leading-relaxed">
+            <strong>Entertainment Only:</strong> This app does not provide medical advice, diagnosis, or treatment. Scores are for fun and are not scientifically validated. Always consult a dermatologist for any hair or scalp concerns.
+          </p>
+        </div>
       </div>
     </div>
   );
